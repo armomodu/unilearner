@@ -52,6 +52,7 @@ next-env.d.ts
 /migrate_hardcode.ps1
 *.log
 /tsc_output.txt
+ENHANCEMENT_ROADMAP.md
 
 # IDE and OS files
 .vscode/
