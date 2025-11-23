@@ -8,6 +8,7 @@ import {
     LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SignOutButton } from '@/components/signout-button';
 
 export default async function AdminLayout({
     children,
@@ -56,12 +57,7 @@ export default async function AdminLayout({
                     <div className="px-4 py-2 text-sm text-muted-foreground truncate">
                         {session.user.email}
                     </div>
-                    <form action="/auth/signout" method="post">
-                        <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:text-destructive">
-                            <LogOut className="w-4 h-4" />
-                            Sign Out
-                        </Button>
-                    </form>
+                    <SignOutButton />
                 </div>
             </aside>
 
