@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/signout-button';
+import { Toaster } from '@/components/ui/sonner';
 
 export default async function AdminLayout({
     children,
@@ -67,6 +68,7 @@ export default async function AdminLayout({
                     {children}
                 </div>
             </main>
+            <Toaster />
         </div>
     );
 }

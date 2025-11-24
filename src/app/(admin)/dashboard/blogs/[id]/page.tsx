@@ -2,16 +2,14 @@ import { createServerClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { GenerationProgress } from '@/components/generation-progress';
+import { BlogEditor } from '@/components/blog-editor';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ExternalLink, Save, Globe } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Globe } from 'lucide-react';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { getOrCreateUser } from '@/lib/db-user';
+import { PublishBlogButton } from '@/components/publish-blog-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,13 +72,6 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
                             </Button>
                         </Link>
                     )}
-                    {/* Note: Save/Publish actions would be client components or server actions. 
-              For simplicity in this MVP, we'll just show the UI structure. 
-              Real implementation would need a client component wrapper for the form. */}
-                    <Button className="gap-2">
-                        <Save className="w-4 h-4" />
-                        Save Changes
-                    </Button>
                 </div>
             </div>
 
@@ -89,35 +80,20 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
-                        <Tabs defaultValue="edit" className="w-full">
-                            <TabsList>
-                                <TabsTrigger value="edit">Editor</TabsTrigger>
-                                <TabsTrigger value="preview">Preview</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="edit" className="mt-4">
-                                <Card>
-                                    <CardContent className="p-0">
-                                        <Textarea
-                                            defaultValue={blog.content}
-                                            className="min-h-[600px] border-0 focus-visible:ring-0 resize-y p-6 font-mono text-sm"
-                                            placeholder="Write your blog post here..."
-                                        />
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                            <TabsContent value="preview" className="mt-4">
-                                <Card>
-                                    <CardContent className="p-8 prose prose-invert max-w-none">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {blog.content}
-                                        </ReactMarkdown>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </Tabs>
+                        <BlogEditor 
+                            blogId={blog.id}
+                            initialTitle={blog.title}
+                            initialContent={blog.content}
+                        />
                     </div>
 
                     <div className="space-y-6">
+                        {/* Temporarily disabled until database schema is updated */}
+                        {/* <HeaderImageUpload 
+                            blogId={blog.id}
+                            currentImageUrl={blog.headerImageUrl}
+                        /> */}
+
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg">Sources</CardTitle>
@@ -151,17 +127,45 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Slug</label>
-                                    <div className="text-sm text-muted-foreground bg-muted p-2 rounded border border-border truncate">
-                                        {blog.slug || 'Not generated yet'}
+                                    <label className="text-sm font-medium">Status</label>
+                                    <Badge variant={blog.status === 'PUBLISHED' ? 'default' : 'secondary'} className="text-xs">
+                                        {blog.status}
+                                        {blog.status === 'PUBLISHED' && blog.publishedAt && (
+                                            <span className="ml-2">
+                                                • {new Date(blog.publishedAt).toLocaleDateString()}
+                                            </span>
+                                        )}
+                                    </Badge>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">URL Slug</label>
+                                    <div className="text-sm text-muted-foreground bg-muted p-2 rounded border border-border">
+                                        {blog.slug ? (
+                                            <div className="break-all">
+                                                {process.env.NEXT_PUBLIC_APP_URL || 'https://your-domain.com'}/blog/{blog.slug}
+                                            </div>
+                                        ) : (
+                                            'Will be generated when published'
+                                        )}
                                     </div>
                                 </div>
-                                <Button
-                                    variant={blog.status === 'PUBLISHED' ? 'destructive' : 'default'}
-                                    className="w-full"
-                                >
-                                    {blog.status === 'PUBLISHED' ? 'Unpublish' : 'Publish Now'}
-                                </Button>
+
+                                <PublishBlogButton
+                                    blogId={blog.id}
+                                    blogTitle={blog.title}
+                                    isPublished={blog.status === 'PUBLISHED'}
+                                    slug={blog.slug}
+                                />
+
+                                {blog.status === 'PUBLISHED' && blog.slug && (
+                                    <Link href={`/blog/${blog.slug}`} target="_blank" className="block">
+                                        <Button variant="outline" className="w-full gap-2">
+                                            <ExternalLink className="w-4 h-4" />
+                                            View Live Post
+                                        </Button>
+                                    </Link>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

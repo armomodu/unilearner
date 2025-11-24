@@ -39,12 +39,11 @@ export async function researchAgent(
             model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
-                thinking_level: 'high',
-                response_mime_type: 'application/json'
+                responseMimeType: 'application/json'
             }
         });
 
-        const text = response.text;
+        const text = response.text || '';
         console.log('Gemini 3 Pro research completed successfully');
         
         // Parse JSON response
@@ -52,7 +51,7 @@ export async function researchAgent(
             return JSON.parse(text);
         } catch (parseError) {
             // Fallback: try to extract JSON from response
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            const jsonMatch = text?.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error('Failed to parse JSON from Gemini 3 response');
             }
