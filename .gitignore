@@ -53,6 +53,7 @@ next-env.d.ts
 *.log
 /tsc_output.txt
 ENHANCEMENT_ROADMAP.md
+asset/
 
 # IDE and OS files
 .vscode/
