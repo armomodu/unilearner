@@ -4,6 +4,42 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock } from 'lucide-react';
+import { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+    const { slug } = await params;
+    const blog = await prisma.blog.findUnique({
+        where: { slug },
+        select: {
+            title: true,
+            excerpt: true,
+            content: true,
+        },
+    });
+
+    if (!blog) {
+        return {
+            title: 'Blog Not Found',
+        };
+    }
+
+    const description = blog.excerpt || blog.content.substring(0, 160) + '...';
+
+    return {
+        title: `${blog.title} | UniLearner Blog`,
+        description,
+        openGraph: {
+            title: blog.title,
+            description,
+            type: 'article',
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: blog.title,
+            description,
+        },
+    };
+}
 
 export default async function PublicBlogPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;

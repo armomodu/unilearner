@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Clock } from 'lucide-react';
+import { Save, Clock, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
+import { InlineImageUpload } from './inline-image-upload';
+import { resizeImage, isImageFile } from '@/lib/image-utils';
 
 interface BlogEditorProps {
     blogId: string;
@@ -22,6 +24,8 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
+    const [showImageUpload, setShowImageUpload] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Track changes
     useEffect(() => {
@@ -67,6 +71,77 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
         }
     }, [blogId, title, content, hasChanges]);
 
+    // Image insertion handler
+    const handleImageInsert = useCallback((markdown: string, imageUrl: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const currentContent = content;
+        
+        // Insert markdown at cursor position or replace selection
+        const newContent = currentContent.slice(0, start) + '\n\n' + markdown + '\n\n' + currentContent.slice(end);
+        setContent(newContent);
+        
+        // Focus back to textarea and position cursor after the inserted markdown
+        setTimeout(() => {
+            textarea.focus();
+            const newCursorPos = start + markdown.length + 4; // +4 for the newlines
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 100);
+    }, [content]);
+
+    // Handle paste images
+    const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (file && isImageFile(file)) {
+                    try {
+                        // Auto-resize pasted images
+                        let processedFile = file;
+                        if (file.size > 1024 * 1024) { // 1MB threshold
+                            toast.loading('Optimizing pasted image...', { id: 'paste-resize' });
+                            processedFile = await resizeImage(file, {
+                                maxWidth: 1200,
+                                maxHeight: 800,
+                                quality: 0.85,
+                                format: 'jpeg'
+                            });
+                            toast.success('Image optimized', { id: 'paste-resize' });
+                        }
+
+                        // Upload the processed image
+                        const formData = new FormData();
+                        formData.append('image', processedFile);
+
+                        const response = await fetch(`/api/blogs/${blogId}/upload-inline-image`, {
+                            method: 'POST',
+                            body: formData,
+                        });
+
+                        const result = await response.json();
+                        if (response.ok) {
+                            handleImageInsert(result.markdown, result.imageUrl);
+                            toast.success(`Image pasted and uploaded successfully${processedFile.size !== file.size ? ' (optimized)' : ''}`);
+                        } else {
+                            throw new Error(result.error || 'Upload failed');
+                        }
+                    } catch (error) {
+                        console.error('Paste upload error:', error);
+                        toast.error('Failed to upload pasted image');
+                    }
+                }
+                break;
+            }
+        }
+    }, [blogId, handleImageInsert]);
+
     // Keyboard shortcut for save (Ctrl+S / Cmd+S)
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -95,6 +170,16 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                     >
                         <Save className="w-4 h-4" />
                         {isSaving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    
+                    <Button
+                        onClick={() => setShowImageUpload(!showImageUpload)}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                    >
+                        <ImageIcon className="w-4 h-4" />
+                        {showImageUpload ? 'Hide Images' : 'Add Images'}
                     </Button>
                     
                     <div className="flex items-center gap-3">
@@ -130,6 +215,17 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                 </div>
             </div>
 
+            {/* Image Upload Panel */}
+            {showImageUpload && (
+                <div className="mb-6">
+                    <InlineImageUpload 
+                        blogId={blogId}
+                        onImageInsert={handleImageInsert}
+                        className="max-w-md"
+                    />
+                </div>
+            )}
+
             {/* Editor Tabs */}
             <Tabs defaultValue="edit" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -159,10 +255,14 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                     <Card className="border-0 shadow-sm bg-card/30">
                         <CardContent className="p-0">
                             <Textarea
+                                ref={textareaRef}
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
+                                onPaste={handlePaste}
                                 className="min-h-[600px] border-0 focus-visible:ring-0 resize-none p-6 text-sm leading-relaxed bg-transparent placeholder:text-muted-foreground/70"
                                 placeholder="Start writing your blog post here. Use Markdown for formatting:
+
+💡 Pro tip: You can paste images directly (Ctrl+V) or click 'Add Images' above!
 
 # Headings
 ## Subheadings
