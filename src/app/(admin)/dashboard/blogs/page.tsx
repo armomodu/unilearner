@@ -23,6 +23,32 @@ export default async function BlogsPage() {
         orderBy: { createdAt: 'desc' },
         include: {
             _count: { select: { sources: true } },
+            generation: {
+                select: {
+                    id: true,
+                    status: true,
+                    currentStep: true,
+                    searchComplete: true,
+                    researchComplete: true,
+                    writerComplete: true,
+                    error: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    retryCount: true,
+                    // Performance metrics
+                    totalDurationMs: true,
+                    searchDurationMs: true,
+                    researchDurationMs: true,
+                    writerDurationMs: true,
+                    searchStartedAt: true,
+                    searchCompletedAt: true,
+                    researchStartedAt: true,
+                    researchCompletedAt: true,
+                    writerStartedAt: true,
+                    writerCompletedAt: true,
+                    completedAt: true,
+                },
+            },
         },
     });
 
@@ -30,6 +56,18 @@ export default async function BlogsPage() {
     const blogsForClient = blogs.map(blog => ({
         ...blog,
         createdAt: blog.createdAt.toISOString(),
+        generation: blog.generation ? {
+            ...blog.generation,
+            updatedAt: blog.generation.updatedAt.toISOString(),
+            createdAt: blog.generation.createdAt.toISOString(),
+            searchStartedAt: blog.generation.searchStartedAt?.toISOString() || null,
+            searchCompletedAt: blog.generation.searchCompletedAt?.toISOString() || null,
+            researchStartedAt: blog.generation.researchStartedAt?.toISOString() || null,
+            researchCompletedAt: blog.generation.researchCompletedAt?.toISOString() || null,
+            writerStartedAt: blog.generation.writerStartedAt?.toISOString() || null,
+            writerCompletedAt: blog.generation.writerCompletedAt?.toISOString() || null,
+            completedAt: blog.generation.completedAt?.toISOString() || null,
+        } : null,
     }));
 
     return (

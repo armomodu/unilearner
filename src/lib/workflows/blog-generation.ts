@@ -15,22 +15,33 @@ export async function runGenerationWorkflow(
     blogId: string,
     topic: string
 ): Promise<void> {
+    const workflowStartTime = Date.now();
+    
     try {
         // ===================================
         // STEP 1: SEARCH
         // ===================================
+        const searchStartTime = Date.now();
+        
         await updateGenerationStatus(blogId, {
             status: 'SEARCHING',
             currentStep: 'Searching web sources...',
+            searchStartedAt: new Date(searchStartTime),
         });
 
         const searchResults = await searchAgent(topic);
+        
+        const searchEndTime = Date.now();
+        const searchDurationMs = searchEndTime - searchStartTime;
 
         await prisma.blogGeneration.update({
             where: { blogId },
             data: {
                 searchComplete: true,
                 searchData: searchResults as unknown as Prisma.InputJsonValue,
+                searchStartedAt: new Date(searchStartTime),
+                searchCompletedAt: new Date(searchEndTime),
+                searchDurationMs,
                 updatedAt: new Date(),
             },
         });
@@ -38,18 +49,27 @@ export async function runGenerationWorkflow(
         // ===================================
         // STEP 2: RESEARCH
         // ===================================
+        const researchStartTime = Date.now();
+        
         await updateGenerationStatus(blogId, {
             status: 'RESEARCHING',
             currentStep: 'Analyzing sources and extracting insights...',
+            researchStartedAt: new Date(researchStartTime),
         });
 
         const research = await researchAgent(topic, searchResults);
+        
+        const researchEndTime = Date.now();
+        const researchDurationMs = researchEndTime - researchStartTime;
 
         await prisma.blogGeneration.update({
             where: { blogId },
             data: {
                 researchComplete: true,
                 researchData: research as unknown as Prisma.InputJsonValue,
+                researchStartedAt: new Date(researchStartTime),
+                researchCompletedAt: new Date(researchEndTime),
+                researchDurationMs,
                 updatedAt: new Date(),
             },
         });
@@ -57,17 +77,26 @@ export async function runGenerationWorkflow(
         // ===================================
         // STEP 3: WRITE
         // ===================================
+        const writerStartTime = Date.now();
+        
         await updateGenerationStatus(blogId, {
             status: 'WRITING',
             currentStep: 'Generating blog content...',
+            writerStartedAt: new Date(writerStartTime),
         });
 
         const content = await writerAgent(topic, searchResults, research);
+        
+        const writerEndTime = Date.now();
+        const writerDurationMs = writerEndTime - writerStartTime;
 
         await prisma.blogGeneration.update({
             where: { blogId },
             data: {
                 writerComplete: true,
+                writerStartedAt: new Date(writerStartTime),
+                writerCompletedAt: new Date(writerEndTime),
+                writerDurationMs,
                 updatedAt: new Date(),
             },
         });
@@ -100,12 +129,18 @@ export async function runGenerationWorkflow(
             });
         }
 
+        // Calculate total duration
+        const workflowEndTime = Date.now();
+        const totalDurationMs = workflowEndTime - workflowStartTime;
+
         // Mark generation as completed
         await prisma.blogGeneration.update({
             where: { blogId },
             data: {
                 status: 'COMPLETED',
                 currentStep: 'Blog generation complete',
+                totalDurationMs,
+                completedAt: new Date(workflowEndTime),
                 updatedAt: new Date(),
             },
         });
@@ -137,6 +172,9 @@ async function updateGenerationStatus(
     data: {
         status: 'PENDING' | 'SEARCHING' | 'RESEARCHING' | 'WRITING' | 'COMPLETED' | 'FAILED';
         currentStep: string;
+        searchStartedAt?: Date;
+        researchStartedAt?: Date;
+        writerStartedAt?: Date;
     }
 ): Promise<void> {
     await prisma.blogGeneration.update({

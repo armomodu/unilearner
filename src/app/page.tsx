@@ -12,9 +12,15 @@ export default function LandingPage() {
           <div className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
             UniLearner
           </div>
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-6">
+            <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              About
+            </Link>
             <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Blog
+            </Link>
+            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Contact
             </Link>
             <Link href="/login">
               <Button variant="ghost">Sign In</Button>
@@ -266,9 +272,93 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} UniLearner. All rights reserved.</p>
+      <footer className="border-t border-border py-12 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            {/* Brand */}
+            <div className="space-y-4">
+              <div className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+                UniLearner
+              </div>
+              <p className="text-sm text-muted-foreground">
+                AI-powered content creation platform that transforms topics into comprehensive, well-researched blog posts.
+              </p>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h3 className="font-semibold mb-4">Company</h3>
+              <div className="space-y-2 text-sm">
+                <Link href="/about" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  About Us
+                </Link>
+                <Link href="/blog" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Blog
+                </Link>
+                <Link href="/contact" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Contact
+                </Link>
+              </div>
+            </div>
+
+            {/* Product */}
+            <div>
+              <h3 className="font-semibold mb-4">Product</h3>
+              <div className="space-y-2 text-sm">
+                <Link href="/signup" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Get Started
+                </Link>
+                <Link href="/login" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Sign In
+                </Link>
+                <Link href="/dashboard" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Dashboard
+                </Link>
+              </div>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h3 className="font-semibold mb-4">Support</h3>
+              <div className="space-y-2 text-sm">
+                <Link href="/contact" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Contact Us
+                </Link>
+                <a href="mailto:help@unilearner.com" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Help Center
+                </a>
+                <a href="mailto:support@unilearner.com" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Technical Support
+                </a>
+              </div>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h3 className="font-semibold mb-4">Legal</h3>
+              <div className="space-y-2 text-sm">
+                <a href="#" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Privacy Policy
+                </a>
+                <a href="#" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Terms of Service
+                </a>
+                <a href="#" className="block text-muted-foreground hover:text-foreground transition-colors">
+                  Cookie Policy
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              &copy; {new Date().getFullYear()} UniLearner. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <span>Made with ❤️ for content creators</span>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

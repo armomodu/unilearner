@@ -80,3 +80,10 @@ tmp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Development and configuration files
+.claude_config
+docs/
+scripts/supabase-manual-schema.sql
+env-example-fixed.txt
+lint_errors*.log

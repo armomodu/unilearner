@@ -67,17 +67,30 @@ model BlogGeneration {
   
   searchComplete   Boolean          @default(false)
   searchData       Json?
+  searchStartedAt  DateTime?
+  searchCompletedAt DateTime?
   
   researchComplete Boolean          @default(false)
   researchData     Json?
+  researchStartedAt DateTime?
+  researchCompletedAt DateTime?
   
   writerComplete   Boolean          @default(false)
+  writerStartedAt  DateTime?
+  writerCompletedAt DateTime?
+  
+  // Performance metrics
+  totalDurationMs  Int?             // Total generation time in milliseconds
+  searchDurationMs Int?             // Search agent duration
+  researchDurationMs Int?           // Research agent duration  
+  writerDurationMs Int?             // Writer agent duration
   
   error            String?          @db.Text
   retryCount       Int              @default(0)
   
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  completedAt      DateTime?        // When generation fully completed
   
   @@index([status, updatedAt])
   @@index([blogId])

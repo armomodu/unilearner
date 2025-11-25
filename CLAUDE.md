@@ -61,8 +61,11 @@ User Input (Topic) → Search Agent (Tavily) → Research Agent (Gemini 3 Pro) �
 ### Database Schema
 Key models: `User`, `Blog`, `BlogGeneration`, `Source`
 - Blogs have statuses: `GENERATING` → `DRAFT` → `PUBLISHED`
-- BlogGeneration tracks async workflow progress
-- Sources store citations from web searches
+- BlogGeneration tracks async workflow progress with **performance metrics**:
+  - Phase timing: `searchStartedAt/CompletedAt`, `researchStartedAt/CompletedAt`, `writerStartedAt/CompletedAt`
+  - Duration tracking: `searchDurationMs`, `researchDurationMs`, `writerDurationMs`, `totalDurationMs`
+  - Completion tracking: `completedAt` timestamp
+- Sources store citations from web searches with relevance scoring
 
 ## Important Implementation Details
 
@@ -112,11 +115,15 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
    - Model: `claude-sonnet-4-5`
 
 ### Async Workflow Pattern
-Blog generation runs asynchronously:
+Blog generation runs asynchronously with **full performance tracking**:
 1. API creates blog record with `GENERATING` status
-2. Background workflow updates `BlogGeneration` table at each step
-3. Frontend polls status endpoint every 2 seconds
-4. On completion, blog status becomes `DRAFT` for user review
+2. Background workflow (`runGenerationWorkflow`) times each phase:
+   - Search Agent: Records `searchStartedAt`, `searchCompletedAt`, `searchDurationMs`
+   - Research Agent: Records `researchStartedAt`, `researchCompletedAt`, `researchDurationMs`  
+   - Writer Agent: Records `writerStartedAt`, `writerCompletedAt`, `writerDurationMs`
+   - Overall: Calculates `totalDurationMs` and `completedAt`
+3. Frontend polls status endpoint every 2 seconds showing real-time progress
+4. On completion, blog status becomes `DRAFT` with full performance metrics available
 
 ### Authentication Flow
 - Supabase handles auth with email/password
@@ -141,6 +148,8 @@ Blog generation runs asynchronously:
 - **Access denied errors**: Check user ID comparison - use local `user.id`, not `session.user.id`
 - **Unique slug constraint**: Blog creation generates unique slugs like `draft-topic-timestamp`
 - **AI model errors**: Use correct model names: `gemini-3-pro-preview` and `claude-sonnet-4-5`
+- **Performance metrics missing**: If new columns don't exist, app gracefully shows "--" placeholders
+- **Dev server lock**: Remove `.next/dev/lock` or entire `.next/dev` directory if "lock" errors occur
 
 ### Testing Blog Generation
 Use these test topics for development:
@@ -161,17 +170,37 @@ Add new components with:
 npx shadcn@latest add [component-name]
 ```
 
+### Performance Metrics Architecture
+**Key Components**:
+- **`/src/lib/utils/performance.ts`** - Performance calculation utilities (formatting, ratings, percentages)
+- **`/src/components/performance-metrics.tsx`** - UI components (`PerformanceMetricsCard`, `InlinePerformanceMetrics`)
+- **Workflow Integration** - `runGenerationWorkflow` automatically tracks timing for all phases
+
+**Performance Features**:
+- Real-time timing of Search → Research → Writer phases  
+- Performance ratings: Excellent (<2min), Good (<5min), Average (<10min), Slow (>10min)
+- Phase breakdown with progress bars showing time distribution
+- Writing speed calculation (words per minute)
+- Dashboard integration with performance column in blog list
+
 ## API Endpoints
 
 ### Blog Management
-- `GET /api/blogs` - List user's blogs
-- `POST /api/blogs/generate` - Start blog generation
-- `GET /api/blogs/[id]/status` - Get generation status
+- `GET /api/blogs` - List user's blogs (includes performance metrics)
+- `POST /api/blogs/generate` - Start blog generation with timing
+- `GET /api/blogs/[id]/status` - Get generation status and performance data
 - `POST /api/blogs/[id]/publish` - Publish draft blog
+- `POST /api/blogs/[id]/unpublish` - Unpublish blog
+- `POST /api/blogs/[id]/upload-image` - Upload header images
+- `POST /api/blogs/[id]/upload-inline-image` - Upload inline images for editor
 
-### Public Access
-- `GET /api/public/blogs` - List published blogs
+### Public Access  
+- `GET /api/public/blogs` - List published blogs with search/filtering
 - `GET /api/public/blogs/[slug]` - Get published blog by slug
+- `POST /api/contact` - Contact form with spam protection and rate limiting
+
+### Template System
+- `POST /api/blogs/create-from-template` - Create blog from predefined templates
 
 ## Error Handling Patterns
 
@@ -273,3 +302,105 @@ When adding new agents or workflows, follow the established pattern of updating 
 3. **Dependency versions**: Pin major versions to avoid breaking changes
 4. **Windows compatibility**: Always test Prisma and other tools on target OS
 5. **Hot reload**: Restart dev server after environment variable changes
+
+### Performance Metrics Database Schema
+**Problem**: Missing performance tracking columns cause query errors.
+
+**Setup Process**:
+1. **Check existing schema**: Use `node scripts/check-schema.js` to verify column presence
+2. **Manual schema update** (if needed): Run SQL in Supabase SQL Editor:
+   ```sql
+   ALTER TABLE blog_generations ADD COLUMN IF NOT EXISTS "searchStartedAt" TIMESTAMP(3);
+   ALTER TABLE blog_generations ADD COLUMN IF NOT EXISTS "searchDurationMs" INTEGER;
+   -- (repeat for all performance columns)
+   ```
+3. **Regenerate client**: `npx prisma generate` after schema changes
+4. **Verify functionality**: New blogs will have full performance tracking, existing blogs show graceful fallbacks
+
+### Public Website Features
+**Complete Foundation**:
+- **Homepage**: Hero section with three-agent workflow explanation, animated gradients
+- **About Page**: Mission, story, tools breakdown, vision with detailed AI system explanation  
+- **Contact Form**: Full validation, rate limiting (5 req/15min), honeypot + keyword spam protection
+- **Blog Search**: Public search with instant filtering, SEO-friendly URLs
+- **Publishing Pipeline**: One-click publish/unpublish with live preview links
+
+### Database Schema Extension Patterns
+**Problem**: When extending existing database tables with new columns, Prisma connection issues can prevent automatic migrations.
+
+**Critical Lessons from Performance Metrics Implementation**:
+
+1. **Connection Issues Are Common**:
+   - "Tenant or user not found" errors often occur during schema updates
+   - Connection string issues (URL encoding, password format) frequently block migrations
+   - Prisma `db push` and `db pull` commands may fail while direct connections work
+
+2. **Safe Schema Extension Process**:
+   ```bash
+   # Step 1: Test database connectivity first
+   node scripts/check-schema.js  # Custom inspection script
+   
+   # Step 2: Manual schema update via Supabase SQL Editor (safest approach)
+   # Use IF NOT EXISTS to prevent errors on existing columns
+   ALTER TABLE table_name ADD COLUMN IF NOT EXISTS "newColumn" TYPE;
+   
+   # Step 3: Update Prisma schema file manually to match database
+   # Add new fields to prisma/schema.prisma
+   
+   # Step 4: Generate client without pushing (since schema already updated)
+   npx prisma generate
+   
+   # Step 5: Remove fallback/error handling code in application
+   ```
+
+3. **Application-Level Resilience**:
+   - **Always implement graceful fallbacks** when adding new database columns
+   - **Use try-catch blocks** in queries until schema is confirmed updated
+   - **Type new fields as optional** (`field?: Type`) initially
+   - **Display placeholders** ("--") for missing data instead of crashing
+
+4. **Schema Update Verification**:
+   ```javascript
+   // Create inspection script: scripts/check-schema.js
+   const { Pool } = require('pg');
+   // Query information_schema.columns to verify new columns exist
+   // Provide detailed column presence reporting
+   ```
+
+5. **Fallback Query Patterns**:
+   ```typescript
+   // Pattern for safe column additions
+   try {
+     const data = await prisma.model.findMany({
+       select: { existingField: true, newField: true }
+     });
+   } catch (error) {
+     // Fallback query without new columns
+     const data = await prisma.model.findMany({
+       select: { existingField: true }
+     });
+   }
+   ```
+
+6. **Production Data Safety**:
+   - **Use `IF NOT EXISTS`** in all ALTER TABLE statements
+   - **Test on development database first** with real data volume
+   - **Preserve existing data** - new columns should be nullable or have defaults
+   - **Verify record counts** before/after to ensure no data loss
+
+7. **Common Supabase Issues & Solutions**:
+   - **Project paused**: Check Supabase dashboard for project status
+   - **URL encoding**: Special characters in password need URL encoding (`!` → `%21`)
+   - **Connection pooling**: Use direct URL for migrations, pooled for app
+   - **Manual SQL approach**: Often more reliable than Prisma commands for schema changes
+
+8. **File-based Database Scripts**:
+   ```bash
+   # Keep safe update scripts for future use
+   scripts/
+   ├── check-schema.js           # Verify current schema
+   ├── safe-performance-update.sql  # Safe column additions
+   └── full-database-schema.sql  # Complete schema recreation
+   ```
+
+This approach allows for **safe database evolution** even when Prisma tooling fails, ensuring data preservation and application stability during schema updates.

@@ -10,6 +10,7 @@ import { ArrowLeft, ExternalLink, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { getOrCreateUser } from '@/lib/db-user';
 import { PublishBlogButton } from '@/components/publish-blog-button';
+import { PerformanceMetricsCard } from '@/components/performance-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,6 +121,27 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Performance Metrics */}
+                        {blog.generation && blog.generation.totalDurationMs && (
+                            <PerformanceMetricsCard
+                                metrics={{
+                                    totalDurationMs: blog.generation.totalDurationMs,
+                                    searchDurationMs: blog.generation.searchDurationMs,
+                                    researchDurationMs: blog.generation.researchDurationMs,
+                                    writerDurationMs: blog.generation.writerDurationMs,
+                                    searchStartedAt: blog.generation.searchStartedAt,
+                                    searchCompletedAt: blog.generation.searchCompletedAt,
+                                    researchStartedAt: blog.generation.researchStartedAt,
+                                    researchCompletedAt: blog.generation.researchCompletedAt,
+                                    writerStartedAt: blog.generation.writerStartedAt,
+                                    writerCompletedAt: blog.generation.writerCompletedAt,
+                                    completedAt: blog.generation.completedAt,
+                                    createdAt: blog.createdAt,
+                                }}
+                                contentWordCount={blog.content.split(/\s+/).length}
+                            />
+                        )}
 
                         <Card>
                             <CardHeader>

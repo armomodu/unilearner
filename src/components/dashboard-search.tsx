@@ -23,6 +23,7 @@ interface Blog {
     _count: {
         sources: number;
     };
+    generation: any;
 }
 
 interface DashboardSearchProps {

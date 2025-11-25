@@ -27,6 +27,7 @@ import { TogglePublishButton } from '@/components/toggle-publish-button';
 import { useBulkDelete } from '@/hooks/use-bulk-delete';
 import { useState } from 'react';
 import { DashboardSearch } from '@/components/dashboard-search';
+import { InlinePerformanceMetrics } from '@/components/performance-metrics';
 
 interface Blog {
     id: string;
@@ -37,6 +38,7 @@ interface Blog {
     _count: {
         sources: number;
     };
+    generation: any;
 }
 
 interface BlogsTableProps {
@@ -122,6 +124,7 @@ export function BlogsTable({ blogs }: BlogsTableProps) {
                             <TableHead>Title</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Sources</TableHead>
+                            <TableHead>Performance</TableHead>
                             <TableHead>Created</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -129,7 +132,7 @@ export function BlogsTable({ blogs }: BlogsTableProps) {
                     <TableBody>
                         {filteredBlogs.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                     {blogs.length === 0 ? 'No blogs found.' : 'No blogs match your search criteria.'}
                                 </TableCell>
                             </TableRow>
@@ -153,6 +156,22 @@ export function BlogsTable({ blogs }: BlogsTableProps) {
                                         </span>
                                     </TableCell>
                                     <TableCell>{blog._count.sources}</TableCell>
+                                    <TableCell>
+                                        {blog.generation && blog.generation.totalDurationMs ? (
+                                            <InlinePerformanceMetrics 
+                                                metrics={{
+                                                    totalDurationMs: blog.generation.totalDurationMs,
+                                                    searchDurationMs: blog.generation.searchDurationMs,
+                                                    researchDurationMs: blog.generation.researchDurationMs,
+                                                    writerDurationMs: blog.generation.writerDurationMs,
+                                                    completedAt: blog.generation.completedAt ? new Date(blog.generation.completedAt) : null,
+                                                    createdAt: new Date(blog.createdAt),
+                                                }} 
+                                            />
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">--</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{new Date(blog.createdAt).toLocaleDateString()}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
