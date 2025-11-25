@@ -130,7 +130,7 @@ export default function ContactPage() {
                         </div>
                         <h1 className="text-4xl font-bold mb-4">Message Sent Successfully!</h1>
                         <p className="text-xl text-muted-foreground mb-8">
-                            Thank you for reaching out. We'll get back to you within 24 hours.
+                            Thank you for reaching out. We&apos;ll get back to you within 24 hours.
                         </p>
                         <div className="flex gap-4 justify-center">
                             <Link href="/">
@@ -164,9 +164,9 @@ export default function ContactPage() {
                             Contact Our Team
                         </span>
                     </h1>
-                    <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                        Have questions about UniLearner? Need help with your account? 
-                        We'd love to hear from you and help you succeed.
+                        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                            Have questions about UniLearner? Need help with your account? 
+                            We&apos;d love to hear from you and help you succeed.
                     </p>
                 </div>
 
@@ -213,7 +213,7 @@ export default function ContactPage() {
                             <CardContent>
                                 <p className="text-muted-foreground">
                                     We typically respond within <strong>24 hours</strong> during business days.
-                                    For urgent issues, please mark your subject with "URGENT".
+                                    For urgent issues, please mark your subject with &quot;URGENT&quot;.
                                 </p>
                             </CardContent>
                         </Card>
@@ -225,7 +225,7 @@ export default function ContactPage() {
                             <CardHeader>
                                 <CardTitle className="text-2xl">Send us a message</CardTitle>
                                 <p className="text-muted-foreground">
-                                    Fill out the form below and we'll get back to you as soon as possible.
+                                    Fill out the form below and we&apos;ll get back to you as soon as possible.
                                 </p>
                             </CardHeader>
                             <CardContent>
@@ -283,7 +283,7 @@ export default function ContactPage() {
                                             name="subject"
                                             value={formData.subject}
                                             onChange={handleInputChange}
-                                            placeholder="What's this about?"
+                                            placeholder="What&apos;s this about?"
                                             className={errors.subject ? 'border-red-500 focus-visible:ring-red-500' : ''}
                                             disabled={isSubmitting}
                                         />
@@ -333,7 +333,7 @@ export default function ContactPage() {
 
                                     <p className="text-xs text-muted-foreground">
                                         By submitting this form, you agree to our privacy policy. 
-                                        We'll never share your information with third parties.
+                                        We&apos;ll never share your information with third parties.
                                     </p>
                                 </form>
                             </CardContent>

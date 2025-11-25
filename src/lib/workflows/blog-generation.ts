@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { searchAgent } from '@/lib/agents/search-agent';
 import { researchAgent } from '@/lib/agents/research-agent';
 import { writerAgent } from '@/lib/agents/writer-agent';
+import { stripNullsDeep } from '@/lib/sanitize';
 
 /**
  * Main blog generation workflow
@@ -29,7 +30,8 @@ export async function runGenerationWorkflow(
             searchStartedAt: new Date(searchStartTime),
         });
 
-        const searchResults = await searchAgent(topic);
+        const rawSearchResults = await searchAgent(topic);
+        const searchResults = stripNullsDeep(rawSearchResults);
         
         const searchEndTime = Date.now();
         const searchDurationMs = searchEndTime - searchStartTime;
@@ -57,7 +59,8 @@ export async function runGenerationWorkflow(
             researchStartedAt: new Date(researchStartTime),
         });
 
-        const research = await researchAgent(topic, searchResults);
+        const rawResearch = await researchAgent(topic, searchResults);
+        const research = stripNullsDeep(rawResearch);
         
         const researchEndTime = Date.now();
         const researchDurationMs = researchEndTime - researchStartTime;
@@ -85,7 +88,8 @@ export async function runGenerationWorkflow(
             writerStartedAt: new Date(writerStartTime),
         });
 
-        const content = await writerAgent(topic, searchResults, research);
+        const rawContent = await writerAgent(topic, searchResults, research);
+        const content = stripNullsDeep(rawContent);
         
         const writerEndTime = Date.now();
         const writerDurationMs = writerEndTime - writerStartTime;

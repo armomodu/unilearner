@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Search, Filter, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { BlogGenerationSummary } from '@/types/blog';
 
 interface Blog {
     id: string;
@@ -23,7 +24,7 @@ interface Blog {
     _count: {
         sources: number;
     };
-    generation: any;
+    generation: BlogGenerationSummary | null;
 }
 
 interface DashboardSearchProps {
@@ -207,7 +208,7 @@ export function DashboardSearch({ blogs, onFilteredResults, className }: Dashboa
                         <div className="flex gap-1">
                             {searchQuery.trim() && (
                                 <Badge variant="secondary" className="text-xs">
-                                    "{searchQuery}"
+                                    &quot;{searchQuery}&quot;
                                 </Badge>
                             )}
                             {statusFilter !== 'all' && (

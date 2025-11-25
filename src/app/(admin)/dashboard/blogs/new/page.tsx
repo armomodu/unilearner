@@ -96,7 +96,7 @@ export default function NewBlogPage() {
                 </Link>
                 <h2 className="text-3xl font-bold tracking-tight">Create New Blog</h2>
                 <p className="text-muted-foreground">
-                    Choose how you'd like to create your blog post - let AI research and write for you, or start with a template.
+                    Choose how you&apos;d like to create your blog post - let AI research and write for you, or start with a template.
                 </p>
             </div>
 

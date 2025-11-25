@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -35,7 +36,7 @@ interface BlogWithStats {
 
 async function getPublishedBlogs(search?: string, sort: string = 'newest'): Promise<BlogWithStats[]> {
     // Build where clause for search
-    const whereClause: any = {
+    const whereClause: Prisma.BlogWhereInput = {
         status: 'PUBLISHED',
     };
 
@@ -63,7 +64,7 @@ async function getPublishedBlogs(search?: string, sort: string = 'newest'): Prom
     }
 
     // Build order clause
-    let orderBy: any = { publishedAt: 'desc' }; // default newest
+    let orderBy: Prisma.BlogOrderByWithRelationInput = { publishedAt: 'desc' }; // default newest
     switch (sort) {
         case 'oldest':
             orderBy = { publishedAt: 'asc' };

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
         const offset = parseInt(searchParams.get('offset') || '0');
 
         // Build where clause for search
-        const whereClause: any = {
+        const whereClause: Prisma.BlogWhereInput = {
             status: 'PUBLISHED',
         };
 
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Build order clause
-        let orderBy: any = { publishedAt: 'desc' }; // default newest
+        let orderBy: Prisma.BlogOrderByWithRelationInput = { publishedAt: 'desc' }; // default newest
         switch (sort) {
             case 'oldest':
                 orderBy = { publishedAt: 'asc' };

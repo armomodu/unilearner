@@ -1,12 +1,11 @@
 // Simple database schema checker
 // Run with: node scripts/check-schema.js
 
-const { Pool } = require('pg');
-
 // Use your direct connection URL
 const connectionString = "postgresql://postgres.iersezswbufuzdufxata:Winter2025!Pass.@aws-0-us-west-2.pooler.supabase.com:5432/postgres";
 
 async function checkSchema() {
+  const { Pool } = await import('pg');
   const pool = new Pool({
     connectionString: connectionString,
     ssl: { rejectUnauthorized: false }

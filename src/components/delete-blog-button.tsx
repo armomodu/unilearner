@@ -75,7 +75,7 @@ export function DeleteBlogButton({
                     <AlertDialogTitle>Delete Blog Post</AlertDialogTitle>
                     <AlertDialogDescription className="space-y-2">
                         <p>Are you sure you want to delete this blog post?</p>
-                        <p className="font-medium text-foreground">"{blogTitle}"</p>
+                        <p className="font-medium text-foreground">&quot;{blogTitle}&quot;</p>
                         <p className="text-sm text-muted-foreground">
                             This action cannot be undone. The blog post and all its associated data will be permanently removed.
                         </p>

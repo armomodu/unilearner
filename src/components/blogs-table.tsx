@@ -28,6 +28,7 @@ import { useBulkDelete } from '@/hooks/use-bulk-delete';
 import { useState } from 'react';
 import { DashboardSearch } from '@/components/dashboard-search';
 import { InlinePerformanceMetrics } from '@/components/performance-metrics';
+import type { BlogGenerationSummary } from '@/types/blog';
 
 interface Blog {
     id: string;
@@ -38,7 +39,7 @@ interface Blog {
     _count: {
         sources: number;
     };
-    generation: any;
+    generation: BlogGenerationSummary | null;
 }
 
 interface BlogsTableProps {

@@ -49,7 +49,7 @@ export default function AboutPage() {
                         </span>
                     </h1>
                     <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                        We're building the future of content creation where artificial intelligence 
+                        We&apos;re building the future of content creation where artificial intelligence 
                         handles research and writing, so you can focus on strategy, creativity, and growth.
                     </p>
                 </div>
@@ -119,7 +119,7 @@ export default function AboutPage() {
                         </Badge>
                         <h2 className="text-4xl font-bold mb-6">Powered by Industry-Leading AI</h2>
                         <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                            We've carefully selected and integrated the most advanced AI models to create 
+                            We&apos;ve carefully selected and integrated the most advanced AI models to create 
                             a seamless content creation pipeline.
                         </p>
                     </div>
@@ -221,7 +221,7 @@ export default function AboutPage() {
                                     <h3 className="text-xl font-semibold mb-4">Global Impact</h3>
                                     <p className="text-muted-foreground leading-relaxed">
                                         We envision a world where language barriers, research skills, and time constraints 
-                                        no longer limit anyone's ability to create high-quality content. Our platform will 
+                                        no longer limit anyone&apos;s ability to create high-quality content. Our platform will 
                                         democratize professional content creation globally.
                                     </p>
                                 </CardContent>
@@ -232,7 +232,7 @@ export default function AboutPage() {
                                     <Clock className="w-12 h-12 text-primary mb-4" />
                                     <h3 className="text-xl font-semibold mb-4">Time Liberation</h3>
                                     <p className="text-muted-foreground leading-relaxed">
-                                        By reducing content creation time from hours to minutes, we're giving creators 
+                                        By reducing content creation time from hours to minutes, we&apos;re giving creators 
                                         their most valuable resource back - time to focus on strategy, creativity, 
                                         and building meaningful connections with their audience.
                                     </p>
