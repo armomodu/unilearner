@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { getOrCreateUser } from '@/lib/db-user';
 import { PublishBlogButton } from '@/components/publish-blog-button';
 import { PerformanceMetricsCard } from '@/components/performance-metrics';
+import type { JSONContent } from '@tiptap/core';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,13 +25,19 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
     const user = await getOrCreateUser(session);
     if (!user) return <div>User not found</div>;
 
-    const blog = await prisma.blog.findUnique({
+    const rawBlog = await prisma.blog.findUnique({
         where: { id },
         include: {
             generation: true,
             sources: true,
         },
     });
+
+    const blog = rawBlog as (typeof rawBlog & {
+        contentType: string;
+        richContent: unknown | null;
+        htmlCache: string | null;
+    }) | null;
 
     if (!blog) notFound();
 
@@ -85,6 +92,8 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
                             blogId={blog.id}
                             initialTitle={blog.title}
                             initialContent={blog.content}
+                            initialContentType={blog.contentType as 'markdown' | 'rich'}
+                            initialRichContent={blog.richContent as JSONContent | null}
                         />
                     </div>
 

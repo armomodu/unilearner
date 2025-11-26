@@ -34,6 +34,9 @@ model Blog {
   title       String
   slug        String     @unique
   content     String     @db.Text
+  contentType String     @default("rich")
+  richContent Json?
+  htmlCache   String?    @db.Text
   excerpt     String?    @db.Text
   status      BlogStatus @default(GENERATING)
   
@@ -51,6 +54,7 @@ model Blog {
   @@index([slug])
   @@index([publishedAt])
   @@index([status])
+  @@index([contentType])
   @@map("blogs")
 }
 

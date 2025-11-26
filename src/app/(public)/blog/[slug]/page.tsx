@@ -1,21 +1,47 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock } from 'lucide-react';
 import { Metadata } from 'next';
+import { BlogContentRenderer } from '@/components/blog-content-renderer';
+import type { BlogStatus } from '@prisma/client';
+
+type BlogMetadataResult = {
+    title: string;
+    excerpt: string | null;
+    content: string;
+    contentType: string;
+    htmlCache: string | null;
+};
+
+type PublicBlogResult = {
+    title: string;
+    content: string;
+    contentType: string;
+    richContent: unknown | null;
+    htmlCache: string | null;
+    excerpt: string | null;
+    status: BlogStatus;
+    publishedAt: Date | null;
+    createdAt: Date;
+    user: {
+        name: string | null;
+    } | null;
+};
+
+function extractPlainText(blog: { contentType?: string | null; content?: string | null; htmlCache?: string | null }) {
+    if (blog.contentType === 'rich') {
+        const html = blog.htmlCache ?? '';
+        return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return blog.content ?? '';
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
     const { slug } = await params;
     const blog = await prisma.blog.findUnique({
         where: { slug },
-        select: {
-            title: true,
-            excerpt: true,
-            content: true,
-        },
-    });
+    }) as BlogMetadataResult | null;
 
     if (!blog) {
         return {
@@ -23,7 +49,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
         };
     }
 
-    const description = blog.excerpt || blog.content.substring(0, 160) + '...';
+    const plainText = blog.excerpt || extractPlainText(blog) || '';
+    const description = plainText ? `${plainText.substring(0, 160)}${plainText.length > 160 ? '...' : ''}` : undefined;
 
     return {
         title: `${blog.title} | UniLearner Blog`,
@@ -50,14 +77,15 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
                 select: { name: true },
             },
         },
-    });
+    }) as PublicBlogResult | null;
 
     if (!blog || blog.status !== 'PUBLISHED') {
         notFound();
     }
 
     // Calculate read time (rough estimate)
-    const wordCount = blog.content.split(/\s+/).length;
+    const textForReadTime = extractPlainText(blog);
+    const wordCount = textForReadTime.split(/\s+/).filter(Boolean).length || blog.content.split(/\s+/).length;
     const readTime = Math.ceil(wordCount / 200);
 
     return (
@@ -85,11 +113,12 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
                 </div>
             </header>
 
-            <div className="prose prose-lg prose-invert mx-auto">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {blog.content}
-                </ReactMarkdown>
-            </div>
+            <BlogContentRenderer
+                contentType={blog.contentType}
+                content={blog.content}
+                richContent={blog.richContent}
+                htmlCache={blog.htmlCache}
+            />
         </article>
     );
 }

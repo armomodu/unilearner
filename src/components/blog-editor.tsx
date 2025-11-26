@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,33 +11,81 @@ import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { InlineImageUpload } from './inline-image-upload';
 import { resizeImage, isImageFile } from '@/lib/image-utils';
+import { RichBlogEditor } from '@/components/rich-editor/rich-blog-editor';
+import { ENABLE_RICH_EDITOR } from '@/lib/feature-flags';
+import type { JSONContent } from '@tiptap/core';
+import { generateRichHtml } from '@/lib/tiptap/html';
 
 interface BlogEditorProps {
     blogId: string;
     initialTitle: string;
     initialContent: string;
+    initialContentType?: 'markdown' | 'rich' | string | null;
+    initialRichContent?: JSONContent | null;
 }
 
-export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorProps) {
+export function BlogEditor({
+    blogId,
+    initialTitle,
+    initialContent,
+    initialContentType = 'markdown',
+    initialRichContent = null,
+}: BlogEditorProps) {
     const [title, setTitle] = useState(initialTitle);
     const [content, setContent] = useState(initialContent);
+    const [richContent, setRichContent] = useState<JSONContent | null>(initialRichContent);
+    const [richPreviewHtml, setRichPreviewHtml] = useState(() =>
+        initialRichContent ? generateRichHtml(initialRichContent) : ''
+    );
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
     const [showImageUpload, setShowImageUpload] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const initialRichContentString = useMemo(
+        () => JSON.stringify(initialRichContent ?? null),
+        [initialRichContent]
+    );
+    const useRichEditor = ENABLE_RICH_EDITOR;
+    const richPreviewPlainText = useMemo(() => {
+        if (!richPreviewHtml) return '';
+        return richPreviewHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }, [richPreviewHtml]);
+    const previewCharacterCount = useRichEditor
+        ? richPreviewPlainText.length
+        : content.length;
 
     // Track changes
     useEffect(() => {
-        const hasContentChanged = content !== initialContent;
+        const hasContentChanged = useRichEditor
+            ? JSON.stringify(richContent ?? null) !== initialRichContentString
+            : content !== initialContent;
         const hasTitleChanged = title !== initialTitle;
         setHasChanges(hasContentChanged || hasTitleChanged);
-    }, [content, title, initialContent, initialTitle]);
+    }, [
+        content,
+        richContent,
+        title,
+        initialContent,
+        initialTitle,
+        useRichEditor,
+        initialRichContentString,
+    ]);
 
     // Manual save function
     const handleSave = useCallback(async () => {
-        if (!title.trim() || !content.trim()) {
-            toast.error('Title and content are required');
+        if (!title.trim()) {
+            toast.error('Title is required');
+            return;
+        }
+
+        if (!useRichEditor && !content.trim()) {
+            toast.error('Content is required');
+            return;
+        }
+
+        if (useRichEditor && !richContent) {
+            toast.error('Rich editor content is empty');
             return;
         }
 
@@ -50,7 +98,9 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                 },
                 body: JSON.stringify({
                     title: title.trim(),
-                    content: content.trim(),
+                    content: useRichEditor ? richPreviewPlainText : content.trim(),
+                    contentType: 'rich',
+                    richContent: useRichEditor ? richContent : undefined,
                 }),
             });
 
@@ -69,7 +119,7 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
         } finally {
             setIsSaving(false);
         }
-    }, [blogId, title, content, hasChanges]);
+    }, [blogId, title, content, richContent, hasChanges, useRichEditor]);
 
     // Image insertion handler
     const handleImageInsert = useCallback((markdown: string, imageUrl: string) => {
@@ -172,15 +222,17 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                         {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>
                     
-                    <Button
-                        onClick={() => setShowImageUpload(!showImageUpload)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                    >
-                        <ImageIcon className="w-4 h-4" />
-                        {showImageUpload ? 'Hide Images' : 'Add Images'}
-                    </Button>
+                    {!useRichEditor && (
+                        <Button
+                            onClick={() => setShowImageUpload(!showImageUpload)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                        >
+                            <ImageIcon className="w-4 h-4" />
+                            {showImageUpload ? 'Hide Images' : 'Add Images'}
+                        </Button>
+                    )}
                     
                     <div className="flex items-center gap-3">
                         {lastSaved && (
@@ -216,7 +268,7 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
             </div>
 
             {/* Image Upload Panel */}
-            {showImageUpload && (
+            {!useRichEditor && showImageUpload && (
                 <div className="mb-6">
                     <InlineImageUpload 
                         blogId={blogId}
@@ -254,13 +306,23 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                     {/* Content Editor */}
                     <Card className="border-0 shadow-sm bg-card/30">
                         <CardContent className="p-0">
-                            <Textarea
-                                ref={textareaRef}
-                                value={content}
-                                onChange={(e) => setContent(e.target.value)}
-                                onPaste={handlePaste}
-                                className="min-h-[600px] border-0 focus-visible:ring-0 resize-none p-6 text-sm leading-relaxed bg-transparent placeholder:text-muted-foreground/70"
-                                placeholder="Start writing your blog post here. Use Markdown for formatting:
+                            {useRichEditor ? (
+                                <RichBlogEditor
+                                    initialContent={initialRichContent}
+                                    initialMarkdown={initialContent}
+                                    onChange={({ json, html }) => {
+                                        setRichContent(json);
+                                        setRichPreviewHtml(html);
+                                    }}
+                                />
+                            ) : (
+                                <Textarea
+                                    ref={textareaRef}
+                                    value={content}
+                                    onChange={(e) => setContent(e.target.value)}
+                                    onPaste={handlePaste}
+                                    className="min-h-[600px] border-0 focus-visible:ring-0 resize-none p-6 text-sm leading-relaxed bg-transparent placeholder:text-muted-foreground/70"
+                                    placeholder="Start writing your blog post here. Use Markdown for formatting:
 
 💡 Pro tip: You can paste images directly (Ctrl+V) or click 'Add Images' above!
 
@@ -277,12 +339,14 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
 
 [Links](https://example.com)
 "
-                                style={{
-                                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                                    lineHeight: '1.6',
-                                    fontSize: '14px'
-                                }}
-                            />
+                                    style={{
+                                        fontFamily:
+                                            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                        lineHeight: '1.6',
+                                        fontSize: '14px',
+                                    }}
+                                />
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -296,14 +360,27 @@ export function BlogEditor({ blogId, initialTitle, initialContent }: BlogEditorP
                                         {title || 'Untitled Blog Post'}
                                     </h1>
                                     <div className="mt-2 text-sm text-muted-foreground">
-                                        Preview • {content.length} characters
+                                        Preview • {previewCharacterCount} characters
                                     </div>
                                 </div>
-                                <div className="prose prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-pre:bg-muted/50 prose-code:bg-muted/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l-primary/50">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {content || '*Start writing to see your content preview...*'}
-                                    </ReactMarkdown>
-                                </div>
+                                {useRichEditor ? (
+                                    richPreviewHtml ? (
+                                        <div
+                                            className="prose prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-pre:bg-muted/50 prose-code:bg-muted/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l-primary/50"
+                                            dangerouslySetInnerHTML={{ __html: richPreviewHtml }}
+                                        />
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground italic">
+                                            Start writing to see your rich content preview...
+                                        </p>
+                                    )
+                                ) : (
+                                    <div className="prose prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-pre:bg-muted/50 prose-code:bg-muted/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-blockquote:border-l-primary/50">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {content || '*Start writing to see your content preview...*'}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

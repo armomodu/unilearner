@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
+import { generateRichHtml } from '@/lib/tiptap/html';
+import type { JSONContent } from '@tiptap/core';
 
 export async function GET(
     request: NextRequest,
@@ -116,24 +118,65 @@ export async function PUT(
 
         // Parse request body
         const body = await request.json();
-        const { title, content } = body;
+        const {
+            title,
+            content,
+            richContent,
+            contentType = 'markdown',
+        }: {
+            title?: string;
+            content?: string;
+            richContent?: JSONContent;
+            contentType?: 'markdown' | 'rich' | string;
+        } = body;
 
-        // Validate required fields
-        if (!title || !content) {
+        if (!title) {
             return NextResponse.json(
-                { error: 'Title and content are required' },
+                { error: 'Title is required' },
                 { status: 400 }
             );
         }
 
+        const normalizedContentType =
+            contentType === 'rich' ? 'rich' : 'markdown';
+
+        if (normalizedContentType === 'markdown' && (!content || !content.trim())) {
+            return NextResponse.json(
+                { error: 'Content is required for Markdown blogs' },
+                { status: 400 }
+            );
+        }
+
+        if (normalizedContentType === 'rich' && !richContent) {
+            return NextResponse.json(
+                { error: 'Rich content payload is required' },
+                { status: 400 }
+            );
+        }
+
+        const trimmedContent = content?.trim() ?? '';
+        const htmlCache =
+            normalizedContentType === 'rich' && richContent
+                ? generateRichHtml(richContent)
+                : null;
+
         // Update blog
+        const updateData: any = {
+            title: title.trim(),
+            content:
+                normalizedContentType === 'markdown'
+                    ? trimmedContent
+                    : trimmedContent || blog.content || '',
+            contentType: normalizedContentType,
+            richContent:
+                normalizedContentType === 'rich' ? richContent : null,
+            htmlCache,
+            updatedAt: new Date(),
+        };
+
         const updatedBlog = await prisma.blog.update({
             where: { id },
-            data: {
-                title: title.trim(),
-                content: content.trim(),
-                updatedAt: new Date(),
-            },
+            data: updateData,
             include: {
                 generation: true,
                 sources: true,
