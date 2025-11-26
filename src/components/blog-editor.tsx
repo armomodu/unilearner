@@ -46,7 +46,7 @@ export function BlogEditor({
         () => JSON.stringify(initialRichContent ?? null),
         [initialRichContent]
     );
-    const useRichEditor = ENABLE_RICH_EDITOR;
+    const useRichEditor = !!initialRichContent;
     const richPreviewPlainText = useMemo(() => {
         if (!richPreviewHtml) return '';
         return richPreviewHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -99,7 +99,7 @@ export function BlogEditor({
                 body: JSON.stringify({
                     title: title.trim(),
                     content: useRichEditor ? richPreviewPlainText : content.trim(),
-                    contentType: 'rich',
+                    contentType: useRichEditor ? 'rich' : 'markdown',
                     richContent: useRichEditor ? richContent : undefined,
                 }),
             });

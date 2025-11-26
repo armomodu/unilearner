@@ -59,12 +59,15 @@ User Input (Topic) → Search Agent (Tavily) → Research Agent (Gemini 3 Pro) �
 - **`/src/middleware.ts`** - Route protection and authentication redirects
 
 ### Database Schema
-Key models: `User`, `Blog`, `BlogGeneration`, `Source`
+Key models: `User`, `Blog`, `BlogGeneration`, `Source`, `WritingStyle`
 - Blogs have statuses: `GENERATING` → `DRAFT` → `PUBLISHED`
+- Blog content supports dual formats: `contentType` ("markdown" | "rich") with `richContent` JSON field and `htmlCache`
+- WritingStyle system with custom prompts (`systemPrompt`, `microPrompt`) and user/default styles
 - BlogGeneration tracks async workflow progress with **performance metrics**:
   - Phase timing: `searchStartedAt/CompletedAt`, `researchStartedAt/CompletedAt`, `writerStartedAt/CompletedAt`
   - Duration tracking: `searchDurationMs`, `researchDurationMs`, `writerDurationMs`, `totalDurationMs`
   - Completion tracking: `completedAt` timestamp
+  - Links to `WritingStyle` used for generation
 - Sources store citations from web searches with relevance scoring
 
 ## Important Implementation Details
@@ -193,6 +196,13 @@ npx shadcn@latest add [component-name]
 - `POST /api/blogs/[id]/unpublish` - Unpublish blog
 - `POST /api/blogs/[id]/upload-image` - Upload header images
 - `POST /api/blogs/[id]/upload-inline-image` - Upload inline images for editor
+
+### Writing Styles Management
+- `GET /api/writing-styles` - List user's writing styles and defaults
+- `POST /api/writing-styles` - Create new writing style
+- `GET /api/writing-styles/[id]` - Get specific writing style
+- `PUT /api/writing-styles/[id]` - Update writing style
+- `DELETE /api/writing-styles/[id]` - Delete user writing style
 
 ### Public Access  
 - `GET /api/public/blogs` - List published blogs with search/filtering
@@ -404,3 +414,55 @@ When adding new agents or workflows, follow the established pattern of updating 
    ```
 
 This approach allows for **safe database evolution** even when Prisma tooling fails, ensuring data preservation and application stability during schema updates.
+
+## Advanced Features
+
+### Rich Text Editor System
+**TipTap Integration** (`/src/components/rich-editor/`):
+- Feature flag controlled via `ENABLE_RICH_EDITOR` in `lib/feature-flags.ts`
+- Dual content support: Markdown and Rich JSON formats
+- Blog `contentType` field determines editor mode ("markdown" | "rich")
+- Rich content stored as JSON in `richContent` field with HTML cache
+- Extensions: Bold, Italic, Code, Links, Images, Tables, Lists, Headings
+- Real-time HTML generation for preview and public display
+
+**Editor Implementation**:
+```typescript
+// Blog model supports both formats
+contentType: String @default("rich")
+richContent: Json?           // TipTap JSON content
+htmlCache: String? @db.Text  // Generated HTML for performance
+```
+
+### Writing Styles System
+**Custom AI Prompts** (`/src/lib/agents/writer-styles.ts`):
+- `WritingStyle` model with `systemPrompt` and optional `microPrompt`
+- Default styles (accessible to all users) and user-specific styles
+- Style selection during blog generation affects Writer Agent behavior
+- Prompts influence tone, structure, and writing approach
+- Admin can create default styles, users can create personal styles
+
+**Database Architecture**:
+```typescript
+model WritingStyle {
+  systemPrompt: String @db.Text  // Main instruction for AI
+  microPrompt?: String @db.Text  // Additional refinement
+  isDefault: Boolean             // Available to all users
+  userId?: String               // User-specific styles
+}
+```
+
+### Image Management System
+**Multi-format Support**:
+- Header images for blog posts via `/api/blogs/[id]/upload-image`
+- Inline images for rich editor via `/api/blogs/[id]/upload-inline-image`
+- Automatic image resizing with `lib/image-utils.ts`
+- Supabase storage integration for file persistence
+- Drag-and-drop upload in rich editor
+
+### Content Migration Patterns
+**Backward Compatibility**:
+- Existing markdown blogs continue working without modification
+- New rich editor blogs generate HTML cache for performance
+- Content type detection allows mixed content workflows
+- Graceful fallbacks for missing rich content fields

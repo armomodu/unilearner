@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SearchResult } from './search-agent';
 import { ResearchOutput } from './research-agent';
+import { resolveWritingStyle, WritingStyleRecord } from './writer-styles';
 
 export interface WriterOutput {
     title: string;
@@ -24,7 +25,8 @@ export interface WriterOutput {
 export async function writerAgent(
     topic: string,
     searchResults: SearchResult[],
-    research: ResearchOutput
+    research: ResearchOutput,
+    styleId?: string
 ): Promise<WriterOutput> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -36,13 +38,15 @@ export async function writerAgent(
         apiKey,
     });
 
-    const prompt = buildWriterPrompt(topic, searchResults, research);
+    const style = await resolveWritingStyle(styleId);
+    const prompt = buildWriterPrompt(topic, searchResults, research, style);
 
     try {
         const message = await anthropic.messages.create({
             model: 'claude-sonnet-4-5', // Latest Claude Sonnet 4.5 model
             max_tokens: 8000,
-            temperature: 1,
+            temperature: 0.6,
+            system: style.systemPrompt,
             messages: [
                 {
                     role: 'user',
@@ -72,9 +76,16 @@ export async function writerAgent(
 function buildWriterPrompt(
     topic: string,
     searchResults: SearchResult[],
-    research: ResearchOutput
+    research: ResearchOutput,
+    style: WritingStyleRecord
 ): string {
-    return `Write a comprehensive, engaging blog post about "${topic}".
+    return `You must strictly adhere to the provided style instructions and never deviate from them.
+
+STYLE SNAPSHOT:
+${style.microPrompt || 'Follow the master style guidance verbatim.'}
+
+TOPIC:
+${topic}
 
 RESEARCH INSIGHTS:
 ${JSON.stringify(research, null, 2)}
@@ -83,24 +94,15 @@ AVAILABLE SOURCES FOR CITATIONS:
 ${searchResults.map((r, i) => `[${i + 1}] ${r.title} - ${r.url}`).join('\n')}
 
 REQUIREMENTS:
-1. Write in an engaging, conversational yet professional style
-2. Follow the provided outline structure from research
-3. Incorporate specific facts, statistics, and insights
-4. Use natural inline citations in format: [Source Title](url)
-5. Create an attention-grabbing introduction
-6. Provide actionable takeaways in the conclusion
-7. Target length: 1200-1500 words
-8. Use Markdown formatting:
-   - # for title (H1)
-   - ## for section headers (H2)
-   - ### for subsections (H3)
-   - **bold** for emphasis
-   - *italic* for subtle emphasis
-   - > for blockquotes
-   - - for bullet lists
-   - 1. for numbered lists
-9. Optimize for SEO with natural keyword usage
-10. Ensure content is original synthesis, not just summarization
+1. Follow the style snapshot above: connected paragraphs, strategic tone, and absolutely no usage of the m dash.
+2. Keep bullets and numbered lists to a minimum. Only use them when clarity demands it; otherwise rely on paragraphs.
+3. Use the outline, insights, and data from RESEARCH INSIGHTS to shape the narrative arc (introduction, analysis, implications, conclusion).
+4. Incorporate specific facts, statistics, and insights from the research and cite them inline using [Source Title](url).
+5. Craft an executive-level introduction that frames the topic, then analyze key forces, and end with forward-looking implications or recommendations.
+6. Maintain a 5-8 minute read length with disciplined paragraphing, rich transitions, and zero fluff.
+7. Markdown formatting is mandatory: insert a blank line between every paragraph, use **bold** for key emphasis, *italic* for nuance, > for the occasional pull quote, and [Anchor Text](https://source) for links. Use # for the title, ## for major sections, and only introduce lists when compressing data-driven insights.
+8. Optimize for SEO with natural keyword usage while keeping the tone human and analytical.
+9. Ensure content is original synthesis, not mere summarization, and never invent citations.
 
 OUTPUT FORMAT (JSON only, no markdown code blocks or other text):
 {

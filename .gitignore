@@ -87,3 +87,4 @@ docs/
 scripts/supabase-manual-schema.sql
 env-example-fixed.txt
 lint_errors*.log
+CLAUDE.md

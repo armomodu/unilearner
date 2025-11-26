@@ -5,7 +5,7 @@ import {
     LayoutDashboard,
     FileText,
     PlusCircle,
-    LogOut
+    Palette
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/signout-button';
@@ -50,6 +50,12 @@ export default async function AdminLayout({
                         <Button variant="ghost" className="w-full justify-start gap-2">
                             <PlusCircle className="w-4 h-4" />
                             New Blog
+                        </Button>
+                    </Link>
+                    <Link href="/dashboard/styles">
+                        <Button variant="ghost" className="w-full justify-start gap-2">
+                            <Palette className="w-4 h-4" />
+                            Writing Styles
                         </Button>
                     </Link>
                 </nav>

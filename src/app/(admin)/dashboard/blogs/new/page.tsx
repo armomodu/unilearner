@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,43 @@ import { toast } from 'sonner';
 import { Sparkles, ArrowLeft, FileText, Wand2 } from 'lucide-react';
 import Link from 'next/link';
 import { BlogTemplates, BlogTemplate } from '@/components/blog-templates';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { WritingStyleDTO } from '@/types/writing-style';
 
 export default function NewBlogPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [templateLoading, setTemplateLoading] = useState(false);
+    const [styles, setStyles] = useState<WritingStyleDTO[]>([]);
+    const [stylesLoading, setStylesLoading] = useState(true);
+    const [selectedStyleId, setSelectedStyleId] = useState<string>('');
+    const [stylesError, setStylesError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchStyles = async () => {
+            try {
+                const res = await fetch('/api/writing-styles');
+                if (!res.ok) {
+                    throw new Error('Failed to load styles');
+                }
+                const data = await res.json();
+                const available: WritingStyleDTO[] = data.styles ?? [];
+                setStyles(available);
+                const defaultStyle = available.find(style => style.isDefault) ?? available[0];
+                setSelectedStyleId(defaultStyle ? defaultStyle.id : '');
+                setStylesError(null);
+            } catch (error) {
+                console.error(error);
+                setStylesError('Unable to load writing styles. Default style will be used.');
+            } finally {
+                setStylesLoading(false);
+            }
+        };
+
+        fetchStyles();
+    }, []);
+
+    const selectedStyle = useMemo(() => styles.find(style => style.id === selectedStyleId), [styles, selectedStyleId]);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -30,7 +62,7 @@ export default function NewBlogPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ topic }),
+                body: JSON.stringify({ topic, styleId: selectedStyleId || undefined }),
             });
 
             const data = await res.json();
@@ -137,6 +169,34 @@ export default function NewBlogPage() {
                                         <p className="text-xs text-muted-foreground">
                                             Be specific for better results. The AI will research this topic thoroughly.
                                         </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Writing Style</Label>
+                                        {stylesError ? (
+                                            <p className="text-sm text-destructive">{stylesError}</p>
+                                        ) : (
+                                            <>
+                                                <Select
+                                                    value={selectedStyleId}
+                                                    onValueChange={setSelectedStyleId}
+                                                    disabled={stylesLoading || loading || styles.length === 0}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={stylesLoading ? 'Loading styles...' : 'Select a style'} />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {styles.map((style) => (
+                                                            <SelectItem key={style.id} value={style.id}>
+                                                                {style.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {selectedStyle?.description || 'Default McKinsey-style tone will be used if no option is selected.'}
+                                                </p>
+                                            </>
+                                        )}
                                     </div>
 
                                     <Button type="submit" className="w-full py-6 text-lg gap-2" disabled={loading}>

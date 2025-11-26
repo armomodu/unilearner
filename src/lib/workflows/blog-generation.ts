@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { searchAgent } from '@/lib/agents/search-agent';
 import { researchAgent } from '@/lib/agents/research-agent';
 import { writerAgent } from '@/lib/agents/writer-agent';
+import { markdownToTiptapJson } from '@/lib/tiptap/markdown-converter';
+import { generateRichHtml } from '@/lib/tiptap/html';
 import { stripNullsDeep } from '@/lib/sanitize';
 
 /**
@@ -11,10 +13,12 @@ import { stripNullsDeep } from '@/lib/sanitize';
  * 
  * @param blogId - The blog ID to generate content for
  * @param topic - The blog topic
+ * @param writingStyleId - Optional writing style selection
  */
 export async function runGenerationWorkflow(
     blogId: string,
-    topic: string
+    topic: string,
+    writingStyleId?: string
 ): Promise<void> {
     const workflowStartTime = Date.now();
     
@@ -88,7 +92,7 @@ export async function runGenerationWorkflow(
             writerStartedAt: new Date(writerStartTime),
         });
 
-        const rawContent = await writerAgent(topic, searchResults, research);
+        const rawContent = await writerAgent(topic, searchResults, research, writingStyleId);
         const content = stripNullsDeep(rawContent);
         
         const writerEndTime = Date.now();
@@ -109,13 +113,20 @@ export async function runGenerationWorkflow(
         // STEP 4: FINALIZE
         // ===================================
 
+        // Convert markdown to TipTap JSON for rich text display
+        const richContent = markdownToTiptapJson(content.content);
+        const htmlCache = generateRichHtml(richContent);
+
         // Update blog record with final content
         await prisma.blog.update({
             where: { id: blogId },
             data: {
                 title: content.title,
                 slug: generateSlug(content.title, blogId),
-                content: content.content,
+                content: content.content, // Keep original markdown for reference
+                contentType: 'rich', // Always use rich format for generated content
+                richContent: richContent,
+                htmlCache: htmlCache,
                 excerpt: content.excerpt,
                 status: 'DRAFT',
                 updatedAt: new Date(),

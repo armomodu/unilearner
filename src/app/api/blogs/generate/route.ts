@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { runGenerationWorkflow } from '@/lib/workflows/blog-generation';
+import { resolveWritingStyle } from '@/lib/agents/writer-styles';
 import { z } from 'zod';
 
 const generateSchema = z.object({
     topic: z.string().min(5, 'Topic must be at least 5 characters').max(200),
+    styleId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -45,7 +46,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { topic } = validation.data;
+        const { topic, styleId } = validation.data;
+        const writingStyle = await resolveWritingStyle(styleId);
 
         // Generate a unique slug for the draft
         const timestamp = Date.now();
@@ -63,6 +65,7 @@ export async function POST(request: NextRequest) {
                 content: '',
                 status: 'GENERATING',
                 userId: dbUser.id,
+                writingStyleId: writingStyle.id,
             },
         });
 
@@ -72,11 +75,12 @@ export async function POST(request: NextRequest) {
                 blogId: blog.id,
                 status: 'PENDING',
                 currentStep: 'Initializing...',
+                writingStyleId: writingStyle.id,
             },
         });
 
         // Start workflow asynchronously (don't await)
-        runGenerationWorkflow(blog.id, topic).catch(error => {
+        runGenerationWorkflow(blog.id, topic, writingStyle.id).catch(error => {
             console.error('Workflow error:', error);
         });
 

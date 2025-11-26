@@ -21,6 +21,7 @@ model User {
   updatedAt  DateTime @updatedAt
   
   blogs      Blog[]
+  writingStyles WritingStyle[]
   
   @@index([supabaseId])
   @@map("users")
@@ -42,6 +43,8 @@ model Blog {
   
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  writingStyleId String?
+  writingStyle WritingStyle? @relation(fields: [writingStyleId], references: [id], onDelete: SetNull)
   
   generation  BlogGeneration?
   sources     Source[]
@@ -65,6 +68,8 @@ model BlogGeneration {
   id               String           @id @default(cuid())
   blogId           String           @unique
   blog             Blog             @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  writingStyleId   String?
+  writingStyle     WritingStyle?    @relation(fields: [writingStyleId], references: [id], onDelete: SetNull)
   
   status           GenerationStatus @default(PENDING)
   currentStep      String?
@@ -118,6 +123,29 @@ model Source {
   
   @@index([blogId])
   @@map("sources")
+}
+
+// ============================================
+// WRITING STYLES
+// ============================================
+model WritingStyle {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  description  String?
+  systemPrompt String    @db.Text @map("system_prompt")
+  microPrompt  String?   @db.Text @map("micro_prompt")
+  isDefault    Boolean   @default(false) @map("is_default")
+  userId       String?   @map("user_id")
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  blogs        Blog[]
+  generations  BlogGeneration[]
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt      @map("updated_at")
+  
+  @@index([userId])
+  @@index([slug])
+  @@map("writing_styles")
 }
 
 // ============================================
