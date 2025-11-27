@@ -12,11 +12,12 @@ interface GenerationProgressProps {
 }
 
 interface GenerationState {
-    status: 'PENDING' | 'SEARCHING' | 'RESEARCHING' | 'WRITING' | 'COMPLETED' | 'FAILED';
+    status: 'PENDING' | 'SEARCHING' | 'RESEARCHING' | 'WRITING' | 'GENERATING_GRAPHICS' | 'COMPLETED' | 'FAILED';
     currentStep: string;
     searchComplete: boolean;
     researchComplete: boolean;
     writerComplete: boolean;
+    graphicsComplete: boolean;
     error?: string;
 }
 
@@ -35,11 +36,12 @@ export function GenerationProgress({ blogId }: GenerationProgressProps) {
                 if (data.generation) {
                     setState(data.generation);
 
-                    // Calculate progress
+                    // Calculate progress (25% per step for 4 steps)
                     let newProgress = 0;
-                    if (data.generation.searchComplete) newProgress += 33;
-                    if (data.generation.researchComplete) newProgress += 33;
-                    if (data.generation.writerComplete) newProgress += 34;
+                    if (data.generation.searchComplete) newProgress += 25;
+                    if (data.generation.researchComplete) newProgress += 25;
+                    if (data.generation.writerComplete) newProgress += 25;
+                    if (data.generation.graphicsComplete) newProgress += 25;
 
                     setProgress(newProgress);
 
@@ -112,7 +114,7 @@ export function GenerationProgress({ blogId }: GenerationProgressProps) {
                     <Progress value={progress} className="h-2" />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className={`grid gap-4 ${state.graphicsComplete || state.status === 'GENERATING_GRAPHICS' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                     <StepStatus
                         label="Search"
                         active={state.status === 'SEARCHING'}
@@ -128,6 +130,13 @@ export function GenerationProgress({ blogId }: GenerationProgressProps) {
                         active={state.status === 'WRITING'}
                         completed={state.writerComplete}
                     />
+                    {(state.graphicsComplete || state.status === 'GENERATING_GRAPHICS') && (
+                        <StepStatus
+                            label="Graphics"
+                            active={state.status === 'GENERATING_GRAPHICS'}
+                            completed={state.graphicsComplete}
+                        />
+                    )}
                 </div>
             </CardContent>
         </Card>

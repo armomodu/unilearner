@@ -18,9 +18,12 @@ export default function NewBlogPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [templateLoading, setTemplateLoading] = useState(false);
-    const [styles, setStyles] = useState<WritingStyleDTO[]>([]);
+    const [writingStyles, setWritingStyles] = useState<WritingStyleDTO[]>([]);
+    const [graphicsStyles, setGraphicsStyles] = useState<WritingStyleDTO[]>([]);
     const [stylesLoading, setStylesLoading] = useState(true);
-    const [selectedStyleId, setSelectedStyleId] = useState<string>('');
+    const [selectedWritingStyleId, setSelectedWritingStyleId] = useState<string>('');
+    const [selectedGraphicsStyleId, setSelectedGraphicsStyleId] = useState<string>('');
+    const [enableGraphics, setEnableGraphics] = useState(false);
     const [stylesError, setStylesError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -31,14 +34,25 @@ export default function NewBlogPage() {
                     throw new Error('Failed to load styles');
                 }
                 const data = await res.json();
-                const available: WritingStyleDTO[] = data.styles ?? [];
-                setStyles(available);
-                const defaultStyle = available.find(style => style.isDefault) ?? available[0];
-                setSelectedStyleId(defaultStyle ? defaultStyle.id : '');
+                const allStyles: WritingStyleDTO[] = data.styles ?? [];
+
+                // Separate writing and graphics styles
+                const writing = allStyles.filter(s => s.styleType === 'WRITING');
+                const graphics = allStyles.filter(s => s.styleType === 'GRAPHICS');
+
+                setWritingStyles(writing);
+                setGraphicsStyles(graphics);
+
+                // Auto-select default styles
+                const defaultWriting = writing.find(s => s.isDefault) ?? writing[0];
+                const defaultGraphics = graphics.find(s => s.isDefault) ?? graphics[0];
+
+                setSelectedWritingStyleId(defaultWriting?.id || '');
+                setSelectedGraphicsStyleId(defaultGraphics?.id || '');
                 setStylesError(null);
             } catch (error) {
                 console.error(error);
-                setStylesError('Unable to load writing styles. Default style will be used.');
+                setStylesError('Unable to load styles. Default styles will be used.');
             } finally {
                 setStylesLoading(false);
             }
@@ -47,7 +61,15 @@ export default function NewBlogPage() {
         fetchStyles();
     }, []);
 
-    const selectedStyle = useMemo(() => styles.find(style => style.id === selectedStyleId), [styles, selectedStyleId]);
+    const selectedWritingStyle = useMemo(
+        () => writingStyles.find(style => style.id === selectedWritingStyleId),
+        [writingStyles, selectedWritingStyleId]
+    );
+
+    const selectedGraphicsStyle = useMemo(
+        () => graphicsStyles.find(style => style.id === selectedGraphicsStyleId),
+        [graphicsStyles, selectedGraphicsStyleId]
+    );
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -62,7 +84,11 @@ export default function NewBlogPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ topic, styleId: selectedStyleId || undefined }),
+                body: JSON.stringify({
+                    topic,
+                    styleId: selectedWritingStyleId || undefined,
+                    graphicsStyleId: enableGraphics ? (selectedGraphicsStyleId || undefined) : undefined,
+                }),
             });
 
             const data = await res.json();
@@ -170,6 +196,7 @@ export default function NewBlogPage() {
                                             Be specific for better results. The AI will research this topic thoroughly.
                                         </p>
                                     </div>
+                                    {/* Writing Style Selection */}
                                     <div className="space-y-2">
                                         <Label>Writing Style</Label>
                                         {stylesError ? (
@@ -177,15 +204,15 @@ export default function NewBlogPage() {
                                         ) : (
                                             <>
                                                 <Select
-                                                    value={selectedStyleId}
-                                                    onValueChange={setSelectedStyleId}
-                                                    disabled={stylesLoading || loading || styles.length === 0}
+                                                    value={selectedWritingStyleId}
+                                                    onValueChange={setSelectedWritingStyleId}
+                                                    disabled={stylesLoading || loading || writingStyles.length === 0}
                                                 >
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder={stylesLoading ? 'Loading styles...' : 'Select a style'} />
+                                                        <SelectValue placeholder={stylesLoading ? 'Loading styles...' : 'Select a writing style'} />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {styles.map((style) => (
+                                                        {writingStyles.map((style) => (
                                                             <SelectItem key={style.id} value={style.id}>
                                                                 {style.name}
                                                             </SelectItem>
@@ -193,11 +220,57 @@ export default function NewBlogPage() {
                                                     </SelectContent>
                                                 </Select>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {selectedStyle?.description || 'Default McKinsey-style tone will be used if no option is selected.'}
+                                                    {selectedWritingStyle?.description || 'Default McKinsey-style tone will be used.'}
                                                 </p>
                                             </>
                                         )}
                                     </div>
+
+                                    {/* Graphics Generation Toggle */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="enableGraphics"
+                                                checked={enableGraphics}
+                                                onChange={(e) => setEnableGraphics(e.target.checked)}
+                                                disabled={loading}
+                                                className="w-4 h-4 rounded border-gray-300"
+                                            />
+                                            <Label htmlFor="enableGraphics" className="cursor-pointer font-normal">
+                                                Generate AI Infographic
+                                            </Label>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground ml-6">
+                                            AI will create a professional visual summary of your blog content
+                                        </p>
+                                    </div>
+
+                                    {/* Graphics Style Selection (shown when enabled) */}
+                                    {enableGraphics && (
+                                        <div className="space-y-2 ml-6 p-4 border rounded-lg bg-muted/30">
+                                            <Label>Graphics Style</Label>
+                                            <Select
+                                                value={selectedGraphicsStyleId}
+                                                onValueChange={setSelectedGraphicsStyleId}
+                                                disabled={stylesLoading || loading || graphicsStyles.length === 0}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder={stylesLoading ? 'Loading graphics styles...' : 'Select a graphics style'} />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {graphicsStyles.map((style) => (
+                                                        <SelectItem key={style.id} value={style.id}>
+                                                            {style.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-xs text-muted-foreground">
+                                                {selectedGraphicsStyle?.description || 'Select a graphics style for the infographic.'}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     <Button type="submit" className="w-full py-6 text-lg gap-2" disabled={loading}>
                                         {loading ? (

@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { getOrCreateUser } from '@/lib/db-user';
 import { ensureDefaultWritingStyle, generateStyleSlug, getWritingStylesForUser } from '@/lib/agents/writer-styles';
+import { ensureDefaultGraphicsStyle, getGraphicsStylesForUser } from '@/lib/agents/graphics-styles';
 import { WritingStyle } from '@prisma/client';
 import { z } from 'zod';
 
@@ -33,15 +34,36 @@ async function authenticate() {
     return { user };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     const { user } = await authenticate();
 
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await ensureDefaultWritingStyle();
-    const styles = await getWritingStylesForUser(user.id);
+    // Get styleType query parameter (writing, graphics, or all)
+    const { searchParams } = new URL(request.url);
+    const typeParam = searchParams.get('type')?.toUpperCase();
+
+    let styles: WritingStyle[] = [];
+
+    // Filter by style type
+    if (typeParam === 'WRITING') {
+        await ensureDefaultWritingStyle();
+        styles = await getWritingStylesForUser(user.id);
+    } else if (typeParam === 'GRAPHICS') {
+        await ensureDefaultGraphicsStyle();
+        styles = await getGraphicsStylesForUser(user.id);
+    } else {
+        // Return all styles (both writing and graphics)
+        await ensureDefaultWritingStyle();
+        await ensureDefaultGraphicsStyle();
+
+        const writingStyles = await getWritingStylesForUser(user.id);
+        const graphicsStyles = await getGraphicsStylesForUser(user.id);
+
+        styles = [...writingStyles, ...graphicsStyles];
+    }
 
     return NextResponse.json({
         styles: styles.map(serializeStyle),

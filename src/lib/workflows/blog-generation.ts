@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { searchAgent } from '@/lib/agents/search-agent';
 import { researchAgent } from '@/lib/agents/research-agent';
 import { writerAgent } from '@/lib/agents/writer-agent';
+import { graphicsAgent } from '@/lib/agents/graphics-agent';
 import { markdownToTiptapJson } from '@/lib/tiptap/markdown-converter';
 import { generateRichHtml } from '@/lib/tiptap/html';
 import { stripNullsDeep } from '@/lib/sanitize';
@@ -10,15 +11,17 @@ import { stripNullsDeep } from '@/lib/sanitize';
 /**
  * Main blog generation workflow
  * Runs asynchronously in background, updates database at each step
- * 
+ *
  * @param blogId - The blog ID to generate content for
  * @param topic - The blog topic
  * @param writingStyleId - Optional writing style selection
+ * @param graphicsStyleId - Optional graphics style selection
  */
 export async function runGenerationWorkflow(
     blogId: string,
     topic: string,
-    writingStyleId?: string
+    writingStyleId?: string,
+    graphicsStyleId?: string
 ): Promise<void> {
     const workflowStartTime = Date.now();
     
@@ -110,14 +113,71 @@ export async function runGenerationWorkflow(
         });
 
         // ===================================
-        // STEP 4: FINALIZE
+        // STEP 4: GRAPHICS (OPTIONAL)
+        // ===================================
+        let graphics = null;
+
+        if (graphicsStyleId) {
+            const graphicsStartTime = Date.now();
+
+            await updateGenerationStatus(blogId, {
+                status: 'GENERATING_GRAPHICS',
+                currentStep: 'Creating visual assets...',
+                graphicsStartedAt: new Date(graphicsStartTime),
+            });
+
+            try {
+                const rawGraphics = await graphicsAgent({
+                    topic,
+                    research,
+                    content,
+                    blogId,
+                    styleId: graphicsStyleId,
+                });
+                graphics = stripNullsDeep(rawGraphics);
+
+                const graphicsEndTime = Date.now();
+                const graphicsDurationMs = graphicsEndTime - graphicsStartTime;
+
+                await prisma.blogGeneration.update({
+                    where: { blogId },
+                    data: {
+                        graphicsComplete: true,
+                        graphicsData: graphics as unknown as Prisma.InputJsonValue,
+                        graphicsStartedAt: new Date(graphicsStartTime),
+                        graphicsCompletedAt: new Date(graphicsEndTime),
+                        graphicsDurationMs,
+                        updatedAt: new Date(),
+                    },
+                });
+
+                console.log('Graphics generation completed successfully');
+            } catch (graphicsError) {
+                // Log graphics error but don't fail entire workflow
+                console.error('Graphics generation failed (non-fatal):', graphicsError);
+
+                await prisma.blogGeneration.update({
+                    where: { blogId },
+                    data: {
+                        graphicsComplete: false,
+                        graphicsData: {
+                            error: graphicsError instanceof Error ? graphicsError.message : 'Graphics generation failed',
+                        } as unknown as Prisma.InputJsonValue,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+        }
+
+        // ===================================
+        // STEP 5: FINALIZE
         // ===================================
 
         // Convert markdown to TipTap JSON for rich text display
         const richContent = markdownToTiptapJson(content.content);
         const htmlCache = generateRichHtml(richContent);
 
-        // Update blog record with final content
+        // Update blog record with final content and graphics
         await prisma.blog.update({
             where: { id: blogId },
             data: {
@@ -128,6 +188,7 @@ export async function runGenerationWorkflow(
                 richContent: richContent,
                 htmlCache: htmlCache,
                 excerpt: content.excerpt,
+                graphics: graphics ? (graphics as unknown as Prisma.InputJsonValue) : null,
                 status: 'DRAFT',
                 updatedAt: new Date(),
             },
@@ -185,11 +246,12 @@ export async function runGenerationWorkflow(
 async function updateGenerationStatus(
     blogId: string,
     data: {
-        status: 'PENDING' | 'SEARCHING' | 'RESEARCHING' | 'WRITING' | 'COMPLETED' | 'FAILED';
+        status: 'PENDING' | 'SEARCHING' | 'RESEARCHING' | 'WRITING' | 'GENERATING_GRAPHICS' | 'COMPLETED' | 'FAILED';
         currentStep: string;
         searchStartedAt?: Date;
         researchStartedAt?: Date;
         writerStartedAt?: Date;
+        graphicsStartedAt?: Date;
     }
 ): Promise<void> {
     await prisma.blogGeneration.update({

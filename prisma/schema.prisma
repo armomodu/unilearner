@@ -40,19 +40,22 @@ model Blog {
   htmlCache   String?    @db.Text
   excerpt     String?    @db.Text
   status      BlogStatus @default(GENERATING)
-  
+
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  writingStyleId String?
-  writingStyle WritingStyle? @relation(fields: [writingStyleId], references: [id], onDelete: SetNull)
-  
+  writingStyleId String?  @map("writing_style_id")
+  writingStyle WritingStyle? @relation("BlogWritingStyle", fields: [writingStyleId], references: [id], onDelete: SetNull)
+  graphicsStyleId String? @map("graphics_style_id")
+  graphicsStyle WritingStyle? @relation("BlogGraphicsStyle", fields: [graphicsStyleId], references: [id], onDelete: SetNull)
+  graphics    Json?
+
   generation  BlogGeneration?
   sources     Source[]
-  
+
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   publishedAt DateTime?
-  
+
   @@index([userId, status])
   @@index([slug])
   @@index([publishedAt])
@@ -70,37 +73,43 @@ model BlogGeneration {
   blog             Blog             @relation(fields: [blogId], references: [id], onDelete: Cascade)
   writingStyleId   String?
   writingStyle     WritingStyle?    @relation(fields: [writingStyleId], references: [id], onDelete: SetNull)
-  
+
   status           GenerationStatus @default(PENDING)
   currentStep      String?
-  
+
   searchComplete   Boolean          @default(false)
   searchData       Json?
   searchStartedAt  DateTime?
   searchCompletedAt DateTime?
-  
+
   researchComplete Boolean          @default(false)
   researchData     Json?
   researchStartedAt DateTime?
   researchCompletedAt DateTime?
-  
+
   writerComplete   Boolean          @default(false)
   writerStartedAt  DateTime?
   writerCompletedAt DateTime?
-  
+
+  graphicsComplete Boolean          @default(false) @map("graphics_complete")
+  graphicsData     Json?            @map("graphics_data")
+  graphicsStartedAt DateTime?       @map("graphics_started_at")
+  graphicsCompletedAt DateTime?     @map("graphics_completed_at")
+
   // Performance metrics
-  totalDurationMs  Int?             // Total generation time in milliseconds
-  searchDurationMs Int?             // Search agent duration
-  researchDurationMs Int?           // Research agent duration  
-  writerDurationMs Int?             // Writer agent duration
-  
+  totalDurationMs    Int?           // Total generation time in milliseconds
+  searchDurationMs   Int?           // Search agent duration
+  researchDurationMs Int?           // Research agent duration
+  writerDurationMs   Int?           // Writer agent duration
+  graphicsDurationMs Int?           // Graphics agent duration
+
   error            String?          @db.Text
   retryCount       Int              @default(0)
-  
+
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   completedAt      DateTime?        // When generation fully completed
-  
+
   @@index([status, updatedAt])
   @@index([blogId])
   @@map("blog_generations")
@@ -133,18 +142,22 @@ model WritingStyle {
   slug         String    @unique
   name         String
   description  String?
+  styleType    StyleType @default(WRITING) @map("style_type")
   systemPrompt String    @db.Text @map("system_prompt")
   microPrompt  String?   @db.Text @map("micro_prompt")
+  graphicsConfig Json?   @map("graphics_config")
   isDefault    Boolean   @default(false) @map("is_default")
   userId       String?   @map("user_id")
   user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  blogs        Blog[]
+  blogs        Blog[]    @relation("BlogWritingStyle")
+  blogsWithGraphics Blog[] @relation("BlogGraphicsStyle")
   generations  BlogGeneration[]
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt      @map("updated_at")
-  
+
   @@index([userId])
   @@index([slug])
+  @@index([styleType])
   @@map("writing_styles")
 }
 
@@ -158,10 +171,16 @@ enum BlogStatus {
 }
 
 enum GenerationStatus {
-  PENDING     // Queued for processing
-  SEARCHING   // Search agent running
-  RESEARCHING // Research agent running
-  WRITING     // Writer agent running
-  COMPLETED   // Successfully completed
-  FAILED      // Failed with error
+  PENDING            // Queued for processing
+  SEARCHING          // Search agent running
+  RESEARCHING        // Research agent running
+  WRITING            // Writer agent running
+  GENERATING_GRAPHICS // Graphics agent running
+  COMPLETED          // Successfully completed
+  FAILED             // Failed with error
+}
+
+enum StyleType {
+  WRITING   // Writing/content style
+  GRAPHICS  // Graphics/visual style
 }
