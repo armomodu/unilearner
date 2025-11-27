@@ -47,6 +47,12 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
 
     const isGenerating = blog.status === 'GENERATING' || (blog.generation && blog.generation.status !== 'COMPLETED' && blog.generation.status !== 'FAILED');
 
+    const graphicsData = blog.graphics as {
+        assets?: Array<{ id: string; url: string; alt?: string | null; caption?: string | null }>;
+        metadata?: { styleUsed?: string | null } | null;
+    } | null;
+    const primaryGraphic = Array.isArray(graphicsData?.assets) ? graphicsData?.assets[0] : null;
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -88,6 +94,31 @@ export default async function BlogEditorPage({ params }: { params: Promise<{ id:
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
+                        {primaryGraphic?.url && (
+                            <Card className="overflow-hidden">
+                                <div className="bg-muted border-b">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={primaryGraphic.url}
+                                        alt={primaryGraphic.alt || 'Generated infographic'}
+                                        className="w-full object-cover max-h-[420px]"
+                                        loading="lazy"
+                                    />
+                                </div>
+                                {(primaryGraphic.caption || graphicsData?.metadata?.styleUsed) && (
+                                    <CardContent className="py-4 space-y-1">
+                                        {primaryGraphic.caption && (
+                                            <p className="text-sm text-foreground">{primaryGraphic.caption}</p>
+                                        )}
+                                        {graphicsData?.metadata?.styleUsed && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Generated via {graphicsData.metadata.styleUsed}
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                )}
+                            </Card>
+                        )}
                         <BlogEditor 
                             blogId={blog.id}
                             initialTitle={blog.title}

@@ -22,7 +22,6 @@ import {
     Code,
     Link2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { Editor } from '@tiptap/react';
 
 function ToolbarIconButton({
@@ -187,9 +186,9 @@ export function RichEditorToolbar({ editor }: RichEditorToolbarProps) {
                         const next = event.target.value;
                         const option = blockOptions.find(opt => opt.value === next);
                         if (!option) return;
-                        const chain = editor.chain().focus() as any;
+                        const chain = editor.chain().focus();
                         if (option.level) {
-                            chain.toggleHeading({ level: option.level }).run();
+                            chain.toggleHeading({ level: option.level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
                         } else {
                             chain.setParagraph().run();
                         }
@@ -312,7 +311,7 @@ export function RichEditorToolbar({ editor }: RichEditorToolbarProps) {
                     onChange={(event) => {
                         const value = event.target.value;
                         setTextColor(value);
-                        const chain = editor.chain().focus() as any;
+                        const chain = editor.chain().focus();
                         if (value) {
                             chain.setColor(value).run();
                         } else {
@@ -336,7 +335,7 @@ export function RichEditorToolbar({ editor }: RichEditorToolbarProps) {
                     onChange={(event) => {
                         const value = event.target.value;
                         setHighlightColor(value);
-                        const chain = editor.chain().focus() as any;
+                        const chain = editor.chain().focus();
                         if (value) {
                             chain.setHighlight({ color: value }).run();
                         } else {

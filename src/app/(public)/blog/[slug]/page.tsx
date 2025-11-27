@@ -24,6 +24,7 @@ type PublicBlogResult = {
     status: BlogStatus;
     publishedAt: Date | null;
     createdAt: Date;
+    graphics: unknown | null;
     user: {
         name: string | null;
     } | null;
@@ -88,6 +89,11 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
     const wordCount = textForReadTime.split(/\s+/).filter(Boolean).length || blog.content.split(/\s+/).length;
     const readTime = Math.ceil(wordCount / 200);
 
+    const graphicsData = blog.graphics as {
+        assets?: Array<{ id: string; url: string; alt?: string | null; caption?: string | null }>;
+    } | null;
+    const publicGraphic = Array.isArray(graphicsData?.assets) ? graphicsData?.assets[0] : null;
+
     return (
         <article className="container mx-auto px-4 py-12 max-w-3xl">
             <header className="mb-12 text-center space-y-4">
@@ -112,6 +118,23 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
                     </div>
                 </div>
             </header>
+
+            {publicGraphic?.url && (
+                <figure className="mb-10 space-y-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={publicGraphic.url}
+                        alt={publicGraphic.alt || blog.title}
+                        className="w-full rounded-lg border bg-muted object-cover"
+                        loading="lazy"
+                    />
+                    {publicGraphic.caption && (
+                        <figcaption className="text-sm text-muted-foreground text-center">
+                            {publicGraphic.caption}
+                        </figcaption>
+                    )}
+                </figure>
+            )}
 
             <BlogContentRenderer
                 contentType={blog.contentType}

@@ -81,7 +81,10 @@ export function generateStyleSlug(name: string): string {
 
 async function findDefaultStyle(): Promise<WritingStyle | null> {
     return prisma.writingStyle.findFirst({
-        where: { isDefault: true },
+        where: {
+            isDefault: true,
+            styleType: 'WRITING',
+        },
         orderBy: { createdAt: 'asc' },
     });
 }
@@ -92,10 +95,13 @@ export async function ensureDefaultWritingStyle(): Promise<WritingStyle> {
     });
 
     if (existingBySlug) {
-        if (!existingBySlug.isDefault) {
+        if (!existingBySlug.isDefault || existingBySlug.styleType !== 'WRITING') {
             await prisma.writingStyle.update({
                 where: { id: existingBySlug.id },
-                data: { isDefault: true },
+                data: {
+                    isDefault: true,
+                    styleType: 'WRITING',
+                },
             });
         }
         return existingBySlug;
@@ -104,6 +110,7 @@ export async function ensureDefaultWritingStyle(): Promise<WritingStyle> {
     const newDefault = await prisma.writingStyle.create({
         data: {
             slug: DEFAULT_STYLE_SLUG,
+            styleType: 'WRITING',
             name: DEFAULT_STYLE_DATA.name,
             description: DEFAULT_STYLE_DATA.description,
             microPrompt: DEFAULT_STYLE_DATA.microPrompt,
@@ -129,6 +136,7 @@ export async function getWritingStylesForUser(userId: string): Promise<WritingSt
     await ensureDefaultWritingStyle();
     return prisma.writingStyle.findMany({
         where: {
+            styleType: 'WRITING',
             OR: [{ userId: null }, { userId }],
         },
         orderBy: [
@@ -151,4 +159,3 @@ export async function resolveWritingStyle(styleId?: string): Promise<WritingStyl
 
     return ensureDefaultWritingStyle();
 }
-

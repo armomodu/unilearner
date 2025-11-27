@@ -1,8 +1,34 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
 import type { ResearchOutput } from './research-agent';
 import type { WriterOutput } from './writer-agent';
 import { resolveGraphicsStyle, type GraphicsStyleRecord } from './graphics-styles';
 import { uploadGeneratedGraphic } from '@/lib/graphics-storage';
+
+type GraphicsStyleConfig = {
+    aspectRatio?: string;
+    width?: number;
+    height?: number;
+    audience?: string;
+    visualStyle?: string;
+    colorScheme?: string;
+    includeCharts?: boolean;
+    includeIcons?: boolean;
+    [key: string]: unknown;
+};
+
+function extractGraphicsConfig(style: GraphicsStyleRecord): GraphicsStyleConfig {
+    const raw = style.graphicsConfig;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return {};
+    }
+    return raw as GraphicsStyleConfig;
+}
+
+function clampItems(items: string[], maxItems: number, maxLen: number): string[] {
+    return items.slice(0, maxItems).map(item =>
+        item.length > maxLen ? `${item.slice(0, maxLen - 3)}...` : item
+    );
+}
 
 export interface GraphicsAgentInput {
     topic: string;
@@ -99,13 +125,13 @@ export async function graphicsAgent(input: GraphicsAgentInput): Promise<Graphics
 function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleRecord): string {
     const { topic, research, content } = input;
 
-    // Extract key insights from research and content
-    const keyInsights = research.insights.slice(0, 5);
-    const keyPoints = research.keyPoints.slice(0, 5);
-    const themes = research.themes.slice(0, 3);
+    // Extract key insights from research and content (clamped for readability)
+    const keyInsights = clampItems(research.insights, 4, 220);
+    const keyPoints = clampItems(research.keyPoints, 4, 160);
+    const themes = clampItems(research.themes, 3, 80);
 
     // Get graphics config from style
-    const config = (style.graphicsConfig as Record<string, any>) || {};
+    const config = extractGraphicsConfig(style);
     const microPrompt = style.microPrompt || '';
 
     return `${style.systemPrompt}
@@ -114,16 +140,16 @@ BLOG CONTENT TO VISUALIZE:
 Title: ${content.title}
 Topic: ${topic}
 
-KEY INSIGHTS:
+KEY INSIGHTS (use as short section labels):
 ${keyInsights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
 
-KEY POINTS/STATISTICS:
+KEY POINTS / DATA HIGHLIGHTS (for charts or callouts):
 ${keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
 
 MAIN THEMES:
-${themes.map((theme, i) => `${i + 1}. ${theme}`).join('\n')}
+${themes.map(theme => `- ${theme}`).join('\n')}
 
-EXCERPT:
+EXCERPT (context only, do not render as a paragraph):
 ${content.excerpt}
 
 STYLE GUIDANCE:
@@ -137,9 +163,9 @@ TECHNICAL SPECIFICATIONS:
 
 INSTRUCTIONS:
 Create a professional infographic that summarizes the key insights and themes from the blog content above.
-Focus on visual clarity, professional design, and information hierarchy.
-Ensure all text is accurate, readable, and properly formatted.
-Include visual elements (icons, charts, or diagrams) that support the content.`;
+Use short titles, minimal text, and simple iconography or charts.
+Prioritize visual hierarchy, whitespace, and readability over dense copy.
+Ensure all text is accurate, legible, and concise.`;
 }
 
 /**
@@ -156,7 +182,7 @@ async function generateInfographic(
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
     // Extract graphics config
-    const config = (style.graphicsConfig as Record<string, any>) || {};
+    const config = extractGraphicsConfig(style);
     const aspectRatio = config.aspectRatio || '16:9';
 
     try {
@@ -170,19 +196,31 @@ async function generateInfographic(
             config: {
                 numberOfImages: 1,
                 aspectRatio: aspectRatio,
-                // Additional Imagen config options
-                safetyFilterLevel: 'block_some', // Moderate safety filtering
-                personGeneration: 'dont_allow', // Avoid generating people
+                imageSize: '2K',
+                outputMimeType: 'image/png',
+                safetyFilterLevel: SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
+                personGeneration: PersonGeneration.DONT_ALLOW,
             },
         });
 
         // Extract image data from response
         // The response contains an array of GeneratedImage objects
-        if (!response.images || response.images.length === 0) {
+        console.log('Graphics Agent: API Response structure:', {
+            hasGeneratedImages: !!response.generatedImages,
+            imageCount: response.generatedImages?.length || 0,
+        });
+
+        if (!response.generatedImages || response.generatedImages.length === 0) {
+            console.error('Graphics Agent: Empty response:', response);
             throw new Error('No images returned from Gemini Imagen');
         }
 
-        const generatedImage = response.images[0];
+        const generatedImage = response.generatedImages[0];
+        console.log('Graphics Agent: Generated image structure:', {
+            hasImage: !!generatedImage.image,
+            hasImageBytes: !!generatedImage.image?.imageBytes,
+            hasRaiFilter: !!generatedImage.raiFilteredReason,
+        });
 
         // Check if image was filtered
         if (generatedImage.raiFilteredReason) {
@@ -190,9 +228,14 @@ async function generateInfographic(
         }
 
         // Extract base64 image data
-        const imageData = generatedImage.imageBytes;
+        if (!generatedImage.image) {
+            console.error('Graphics Agent: No image property in response:', generatedImage);
+            throw new Error('No image property in generated response');
+        }
 
+        const imageData = generatedImage.image.imageBytes;
         if (!imageData) {
+            console.error('Graphics Agent: No imageBytes in response:', generatedImage.image);
             throw new Error('No image data in response');
         }
 
@@ -210,7 +253,7 @@ async function generateInfographic(
  * Fallback: Generate a simple text-based description if image generation fails
  * This can be enhanced to use programmatic chart generation libraries
  */
-export function generateFallbackGraphic(input: GraphicsAgentInput): GraphicsOutput {
+export function generateFallbackGraphic(_input: GraphicsAgentInput): GraphicsOutput {
     console.warn('Graphics Agent: Using fallback (no actual graphic generated)');
 
     return {

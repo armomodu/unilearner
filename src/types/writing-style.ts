@@ -6,10 +6,9 @@ export interface WritingStyleDTO {
     styleType: 'WRITING' | 'GRAPHICS';
     systemPrompt: string;
     microPrompt?: string | null;
-    graphicsConfig?: Record<string, any> | null;
+    graphicsConfig?: Record<string, unknown> | null;
     isDefault: boolean;
     userId?: string | null;
     createdAt: string;
     updatedAt: string;
 }
-

@@ -4,6 +4,7 @@ import { searchAgent } from '@/lib/agents/search-agent';
 import { researchAgent } from '@/lib/agents/research-agent';
 import { writerAgent } from '@/lib/agents/writer-agent';
 import { graphicsAgent } from '@/lib/agents/graphics-agent';
+import type { GraphicsOutput } from '@/lib/agents/graphics-agent';
 import { markdownToTiptapJson } from '@/lib/tiptap/markdown-converter';
 import { generateRichHtml } from '@/lib/tiptap/html';
 import { stripNullsDeep } from '@/lib/sanitize';
@@ -115,7 +116,7 @@ export async function runGenerationWorkflow(
         // ===================================
         // STEP 4: GRAPHICS (OPTIONAL)
         // ===================================
-        let graphics = null;
+        let graphics: GraphicsOutput | null = null;
 
         if (graphicsStyleId) {
             const graphicsStartTime = Date.now();
@@ -173,8 +174,18 @@ export async function runGenerationWorkflow(
         // STEP 5: FINALIZE
         // ===================================
 
+        // Inject generated graphic into the rich editor content (but keep writer markdown unchanged)
+        let markdownForRich = content.content;
+        if (graphics && graphics.assets.length > 0) {
+            const primaryAsset = graphics.assets[0];
+            if (primaryAsset?.url) {
+                const altText = primaryAsset.alt || `Infographic summarizing ${topic}`;
+                markdownForRich = `![${altText}](${primaryAsset.url})\n\n${content.content}`;
+            }
+        }
+
         // Convert markdown to TipTap JSON for rich text display
-        const richContent = markdownToTiptapJson(content.content);
+        const richContent = markdownToTiptapJson(markdownForRich);
         const htmlCache = generateRichHtml(richContent);
 
         // Update blog record with final content and graphics
@@ -185,7 +196,7 @@ export async function runGenerationWorkflow(
                 slug: generateSlug(content.title, blogId),
                 content: content.content, // Keep original markdown for reference
                 contentType: 'rich', // Always use rich format for generated content
-                richContent: richContent,
+                richContent: richContent as unknown as Prisma.JsonValue,
                 htmlCache: htmlCache,
                 excerpt: content.excerpt,
                 graphics: graphics ? (graphics as unknown as Prisma.InputJsonValue) : null,

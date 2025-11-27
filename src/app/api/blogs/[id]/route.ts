@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
 import { generateRichHtml } from '@/lib/tiptap/html';
 import type { JSONContent } from '@tiptap/core';
+import { Prisma } from '@prisma/client';
 
 export async function GET(
     request: NextRequest,
@@ -155,21 +156,24 @@ export async function PUT(
         }
 
         const trimmedContent = content?.trim() ?? '';
+        const prismaRichContent =
+            normalizedContentType === 'rich' && richContent
+                ? (richContent as unknown as Prisma.JsonValue)
+                : null;
         const htmlCache =
             normalizedContentType === 'rich' && richContent
                 ? generateRichHtml(richContent)
                 : null;
 
         // Update blog
-        const updateData: any = {
+        const updateData: Prisma.BlogUpdateInput = {
             title: title.trim(),
             content:
                 normalizedContentType === 'markdown'
                     ? trimmedContent
                     : trimmedContent || blog.content || '',
             contentType: normalizedContentType,
-            richContent:
-                normalizedContentType === 'rich' ? richContent : null,
+            richContent: prismaRichContent,
             htmlCache,
             updatedAt: new Date(),
         };

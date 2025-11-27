@@ -214,7 +214,7 @@ export function BlogsTable({ blogs }: BlogsTableProps) {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Multiple Blogs</AlertDialogTitle>
                         <AlertDialogDescription className="space-y-2">
-                            <p>Are you sure you want to delete these {selectedBlogs.length} blog posts?</p>
+                            <div>Are you sure you want to delete these {selectedBlogs.length} blog posts?</div>
                             <div className="max-h-32 overflow-y-auto bg-muted/50 p-2 rounded text-sm">
                                 {selectedBlogs.map(blogId => {
                                     const blog = filteredBlogs.find(b => b.id === blogId);
@@ -225,9 +225,9 @@ export function BlogsTable({ blogs }: BlogsTableProps) {
                                     );
                                 })}
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground">
                                 This action cannot be undone. All selected blog posts and their associated data will be permanently removed.
-                            </p>
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
