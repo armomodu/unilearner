@@ -1,8 +1,8 @@
 import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
-import type { ResearchOutput } from './research-agent';
 import type { WriterOutput } from './writer-agent';
 import { resolveGraphicsStyle, type GraphicsStyleRecord } from './graphics-styles';
 import { uploadGeneratedGraphic } from '@/lib/graphics-storage';
+import { generateExecutiveInfographicPrompt } from './executive-infographic-generator';
 
 type GraphicsStyleConfig = {
     aspectRatio?: string;
@@ -13,6 +13,12 @@ type GraphicsStyleConfig = {
     colorScheme?: string;
     includeCharts?: boolean;
     includeIcons?: boolean;
+    // Executive mode configuration
+    executiveMode?: boolean;
+    layoutArchetype?: string; // 'auto' or specific archetype name
+    themePreference?: 'auto' | 'dark' | 'light';
+    consultingGrade?: boolean;
+    zoneCount?: { min: number; max: number };
     [key: string]: unknown;
 };
 
@@ -24,52 +30,8 @@ function extractGraphicsConfig(style: GraphicsStyleRecord): GraphicsStyleConfig 
     return raw as GraphicsStyleConfig;
 }
 
-function clampItems(items: string[], maxItems: number, maxLen: number): string[] {
-    return items.slice(0, maxItems).map(item =>
-        item.length > maxLen ? `${item.slice(0, maxLen - 3)}...` : item
-    );
-}
-
-function buildSummaryFromSignals(
-    insights: string[],
-    keyPoints: string[],
-    themes: string[]
-): string {
-    const sentences: string[] = [];
-
-    if (insights.length > 0) {
-        sentences.push(
-            `Core insights: ${insights
-                .slice(0, 3)
-                .map(item => item.replace(/[.]+$/, ''))
-                .join('; ')}.`
-        );
-    }
-
-    if (keyPoints.length > 0) {
-        sentences.push(
-            `Critical data points: ${keyPoints
-                .slice(0, 3)
-                .map(item => item.replace(/[.]+$/, ''))
-                .join('; ')}.`
-        );
-    }
-
-    if (themes.length > 0) {
-        sentences.push(
-            `Overall themes: ${themes
-                .slice(0, 2)
-                .map(item => item.replace(/[.]+$/, ''))
-                .join(' and ')}.`
-        );
-    }
-
-    return sentences.join(' ');
-}
-
 export interface GraphicsAgentInput {
     topic: string;
-    research: ResearchOutput;
     content: WriterOutput;
     blogId: string;
     styleId?: string;
@@ -157,53 +119,66 @@ export async function graphicsAgent(input: GraphicsAgentInput): Promise<Graphics
 }
 
 /**
- * Build the image generation prompt using the graphics style template
+ * Build the image generation prompt using the Executive Infographic Generator
  */
 function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleRecord): string {
-    const { topic, research, content } = input;
+    const { topic, content } = input;
 
-    // Extract key insights from research and content (clamped for readability)
-    const keyInsights = clampItems(research.insights, 4, 220);
-    const keyPoints = clampItems(research.keyPoints, 4, 160);
-    const themes = clampItems(research.themes, 3, 80);
-
-    // Get graphics config from style
+    // Check if executive mode is enabled (new feature)
     const config = extractGraphicsConfig(style);
-    const microPrompt = style.microPrompt || '';
-    const summary = buildSummaryFromSignals(research.insights, research.keyPoints, research.themes);
+    const useExecutiveMode = config.executiveMode !== false; // Default to true
 
-    return `${style.systemPrompt}
+    if (useExecutiveMode) {
+        // Use new Executive Infographic Generator
+        console.log('Graphics Agent: Using Executive Infographic Generator mode');
+
+        const executiveOutput = generateExecutiveInfographicPrompt(content, topic);
+
+        console.log('Graphics Agent: Executive analysis:', {
+            theme: executiveOutput.analysisMetadata.detectedTheme,
+            archetype: executiveOutput.analysisMetadata.selectedArchetype,
+            zoneCount: executiveOutput.analysisMetadata.zoneCount,
+            confidence: executiveOutput.analysisMetadata.confidenceScore,
+        });
+
+        // Combine executive prompt with any style-specific overrides
+        const styleOverride = style.microPrompt
+            ? `\n\nSTYLE OVERRIDE:\n${style.microPrompt}`
+            : '';
+
+        return `${executiveOutput.prompt}${styleOverride}
+
+TECHNICAL SPECIFICATIONS (FINAL):
+- Aspect Ratio: ${config.aspectRatio || '16:9'}
+- Resolution: ${config.width || 1920}x${config.height || 1080}px minimum
+- Format: PNG, high quality
+- Output: Professional, consulting-grade infographic`;
+    } else {
+        // Legacy mode (fallback to simple prompt if executive mode disabled)
+        console.log('Graphics Agent: Using legacy mode (executive mode disabled)');
+
+        return `${style.systemPrompt}
 
 BLOG CONTENT TO VISUALIZE:
 Title: ${content.title}
 Topic: ${topic}
+Excerpt: ${content.excerpt}
 
-KEY INSIGHTS (use as short section labels):
-${keyInsights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
-
-KEY POINTS / DATA HIGHLIGHTS (for charts or callouts):
-${keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
-
-MAIN THEMES:
-${themes.map(theme => `- ${theme}`).join('\n')}
-
-CONTEXT SUMMARY (use for tone, do not render as full text):
-${summary || 'Combine the insights, key points, and themes above to tell the story visually.'}
+CONTENT PREVIEW:
+${content.content.substring(0, 500)}...
 
 STYLE GUIDANCE:
-${microPrompt}
+${style.microPrompt || 'Create a professional infographic'}
 
 TECHNICAL SPECIFICATIONS:
 - Aspect Ratio: ${config.aspectRatio || '16:9'}
+- Resolution: ${config.width || 1920}x${config.height || 1080}px
 - Audience: ${config.audience || 'general'}
 - Visual Style: ${config.visualStyle || 'professional'}
 - Color Scheme: ${config.colorScheme || 'balanced'}
 
-INSTRUCTIONS:
-Create a professional infographic that summarizes the key insights and themes from the blog content above.
-Use short titles, minimal text, and simple iconography or charts.
-Prioritize visual hierarchy, whitespace, and readability over dense copy.
-Ensure all text is accurate, legible, and concise.`;
+Create a professional infographic that summarizes the blog content above.`;
+    }
 }
 
 /**
