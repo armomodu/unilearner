@@ -26,7 +26,7 @@ export function BlogContentRenderer({
         if (htmlCache) {
             return (
                 <div
-                    className={cn('prose prose-lg prose-invert mx-auto', className)}
+                    className={cn('prose prose-lg mx-auto text-foreground', className)}
                     dangerouslySetInnerHTML={{ __html: htmlCache }}
                 />
             );
@@ -40,7 +40,7 @@ export function BlogContentRenderer({
     }
 
     return (
-        <div className={cn('prose prose-lg prose-invert mx-auto', className)}>
+        <div className={cn('prose prose-lg mx-auto text-foreground', className)}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {content ?? ''}
             </ReactMarkdown>

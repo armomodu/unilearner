@@ -89,21 +89,11 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
     const wordCount = textForReadTime.split(/\s+/).filter(Boolean).length || blog.content.split(/\s+/).length;
     const readTime = Math.ceil(wordCount / 200);
 
-    const graphicsData = blog.graphics as {
-        assets?: Array<{ id: string; url: string; alt?: string | null; caption?: string | null }>;
-    } | null;
-    const publicGraphic = Array.isArray(graphicsData?.assets) ? graphicsData?.assets[0] : null;
-
     return (
         <article className="container mx-auto px-4 py-12 max-w-3xl">
-            <header className="mb-12 text-center space-y-4">
-                <Badge variant="secondary" className="mb-4">
-                    Blog Post
-                </Badge>
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">
-                    {blog.title}
-                </h1>
-                <div className="flex items-center justify-center gap-6 text-muted-foreground text-sm">
+            <div className="mb-8 flex flex-col items-center text-center space-y-4">
+                <Badge variant="secondary">Blog Post</Badge>
+                <div className="flex items-center gap-6 text-muted-foreground text-sm">
                     <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         {new Date(blog.publishedAt || blog.createdAt).toLocaleDateString('en-US', {
@@ -117,24 +107,7 @@ export default async function PublicBlogPage({ params }: { params: Promise<{ slu
                         {readTime} min read
                     </div>
                 </div>
-            </header>
-
-            {publicGraphic?.url && (
-                <figure className="mb-10 space-y-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={publicGraphic.url}
-                        alt={publicGraphic.alt || blog.title}
-                        className="w-full rounded-lg border bg-muted object-cover"
-                        loading="lazy"
-                    />
-                    {publicGraphic.caption && (
-                        <figcaption className="text-sm text-muted-foreground text-center">
-                            {publicGraphic.caption}
-                        </figcaption>
-                    )}
-                </figure>
-            )}
+            </div>
 
             <BlogContentRenderer
                 contentType={blog.contentType}

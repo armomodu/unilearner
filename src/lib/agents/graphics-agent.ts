@@ -30,6 +30,43 @@ function clampItems(items: string[], maxItems: number, maxLen: number): string[]
     );
 }
 
+function buildSummaryFromSignals(
+    insights: string[],
+    keyPoints: string[],
+    themes: string[]
+): string {
+    const sentences: string[] = [];
+
+    if (insights.length > 0) {
+        sentences.push(
+            `Core insights: ${insights
+                .slice(0, 3)
+                .map(item => item.replace(/[.]+$/, ''))
+                .join('; ')}.`
+        );
+    }
+
+    if (keyPoints.length > 0) {
+        sentences.push(
+            `Critical data points: ${keyPoints
+                .slice(0, 3)
+                .map(item => item.replace(/[.]+$/, ''))
+                .join('; ')}.`
+        );
+    }
+
+    if (themes.length > 0) {
+        sentences.push(
+            `Overall themes: ${themes
+                .slice(0, 2)
+                .map(item => item.replace(/[.]+$/, ''))
+                .join(' and ')}.`
+        );
+    }
+
+    return sentences.join(' ');
+}
+
 export interface GraphicsAgentInput {
     topic: string;
     research: ResearchOutput;
@@ -133,6 +170,7 @@ function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleReco
     // Get graphics config from style
     const config = extractGraphicsConfig(style);
     const microPrompt = style.microPrompt || '';
+    const summary = buildSummaryFromSignals(research.insights, research.keyPoints, research.themes);
 
     return `${style.systemPrompt}
 
@@ -149,8 +187,8 @@ ${keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
 MAIN THEMES:
 ${themes.map(theme => `- ${theme}`).join('\n')}
 
-EXCERPT (context only, do not render as a paragraph):
-${content.excerpt}
+CONTEXT SUMMARY (use for tone, do not render as full text):
+${summary || 'Combine the insights, key points, and themes above to tell the story visually.'}
 
 STYLE GUIDANCE:
 ${microPrompt}

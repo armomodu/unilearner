@@ -207,6 +207,31 @@ export function BlogEditor({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isSaving, hasChanges, handleSave]);
 
+    // Automatically derive the blog title from the editor content so the heading in the editor is the source of truth.
+    useEffect(() => {
+        if (useRichEditor) {
+            if (!richPreviewHtml) return;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(richPreviewHtml, 'text/html');
+            const candidate = doc.querySelector('h1, h2, h3, p');
+            const derived = candidate?.textContent?.trim();
+            if (derived && derived !== title) {
+                setTitle(derived);
+            }
+        } else {
+            const firstLine = content
+                .split('\n')
+                .map(line => line.trim())
+                .find(line => line.length > 0);
+            if (firstLine) {
+                const derived = firstLine.replace(/^#+\s*/, '').trim();
+                if (derived && derived !== title) {
+                    setTitle(derived);
+                }
+            }
+        }
+    }, [useRichEditor, richPreviewHtml, content, title]);
+
     return (
         <>
             {/* Save Button and Status */}
@@ -290,19 +315,6 @@ export function BlogEditor({
                 </TabsList>
                 
                 <TabsContent value="edit" className="mt-4 space-y-4">
-                    {/* Title Editor */}
-                    <Card className="border-0 shadow-sm bg-card/30">
-                        <CardContent className="p-6">
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                className="w-full text-2xl font-bold bg-transparent border-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground/70 leading-tight tracking-tight"
-                                placeholder="Enter your blog title..."
-                            />
-                        </CardContent>
-                    </Card>
-
                     {/* Content Editor */}
                     <Card className="border-0 shadow-sm bg-card/30">
                         <CardContent className="p-0">
@@ -355,13 +367,8 @@ export function BlogEditor({
                     <Card className="border-0 shadow-sm bg-card/30">
                         <CardContent className="p-8">
                             <div className="space-y-6">
-                                <div className="border-b border-border/30 pb-4">
-                                    <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground">
-                                        {title || 'Untitled Blog Post'}
-                                    </h1>
-                                    <div className="mt-2 text-sm text-muted-foreground">
-                                        Preview • {previewCharacterCount} characters
-                                    </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Preview • {previewCharacterCount} characters
                                 </div>
                                 {useRichEditor ? (
                                     richPreviewHtml ? (
