@@ -6,11 +6,11 @@ export type GraphicsStyleRecord = WritingStyle;
 const DEFAULT_GRAPHICS_STYLE_SLUG = 'executive-infographic-16-9';
 
 const DEFAULT_GRAPHICS_STYLE_DATA = {
-    name: 'Executive Infographic (16:9)',
-    description: 'Clean, minimalistic infographics suitable for business presentations and executive audiences.',
+    name: 'Executive Infographic (AI-Powered)',
+    description: 'AI-powered executive infographics with consulting-grade design (BCG/McKinsey quality). Automatically analyzes content to select optimal layout archetype and theme.',
     styleType: 'GRAPHICS' as const,
-    microPrompt: 'Business-grade infographic with executive appeal, 16:9 landscape format, professional and minimalist design.',
-    systemPrompt: `Create an infographic summarizing the blog content.
+    microPrompt: 'Executive-grade infographic using AI-powered content analysis for theme detection and archetype selection.',
+    systemPrompt: `Create a consulting-grade executive infographic summarizing the blog content.
 
 VISUAL STYLE REQUIREMENTS:
 - Use minimalistic business-style visuals suitable for executive audiences
@@ -59,6 +59,12 @@ STYLE GUIDELINES:
         colorScheme: 'professional',
         includeCharts: true,
         includeIcons: true,
+        // Executive mode configuration (NEW)
+        executiveMode: true,
+        layoutArchetype: 'auto', // 'auto' = AI selects best archetype
+        themePreference: 'auto', // 'auto' = AI detects dark vs light
+        consultingGrade: true,
+        zoneCount: { min: 4, max: 6 },
     },
 };
 
@@ -114,6 +120,7 @@ STYLE GUIDELINES:
         colorScheme: 'bold',
         includeCharts: false,
         includeIcons: true,
+        executiveMode: false, // Use legacy mode for social media
     },
 };
 
@@ -171,6 +178,7 @@ STYLE GUIDELINES:
         colorScheme: 'muted',
         includeCharts: false,
         includeIcons: true,
+        executiveMode: false, // Use legacy mode for technical diagrams
     },
 };
 

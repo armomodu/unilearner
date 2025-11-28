@@ -128,9 +128,13 @@ export async function runGenerationWorkflow(
             });
 
             try {
+                // Validate content is suitable for graphics generation
+                if (!content?.content || content.content.length < 300) {
+                    throw new Error('Content too short for executive infographic generation');
+                }
+
                 const rawGraphics = await graphicsAgent({
                     topic,
-                    research,
                     content,
                     blogId,
                     styleId: graphicsStyleId,
@@ -157,12 +161,26 @@ export async function runGenerationWorkflow(
                 // Log graphics error but don't fail entire workflow
                 console.error('Graphics generation failed (non-fatal):', graphicsError);
 
+                // Differentiate error types for better debugging
+                const errorMessage = graphicsError instanceof Error
+                    ? graphicsError.message
+                    : 'Unknown graphics error';
+
+                // Determine if error is retryable (API failures) vs non-retryable (content issues)
+                const isRetryable =
+                    !errorMessage.includes('Content too short') &&
+                    !errorMessage.includes('invalid content') &&
+                    !errorMessage.includes('parsing failed');
+
                 await prisma.blogGeneration.update({
                     where: { blogId },
                     data: {
                         graphicsComplete: false,
                         graphicsData: {
-                            error: graphicsError instanceof Error ? graphicsError.message : 'Graphics generation failed',
+                            error: errorMessage,
+                            retryable: isRetryable,
+                            failedAt: new Date().toISOString(),
+                            errorType: isRetryable ? 'api_error' : 'content_error',
                         } as unknown as Prisma.InputJsonValue,
                         updatedAt: new Date(),
                     },
