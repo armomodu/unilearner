@@ -1,8 +1,8 @@
-import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { WriterOutput } from './writer-agent';
 import { resolveGraphicsStyle, type GraphicsStyleRecord } from './graphics-styles';
 import { uploadGeneratedGraphic } from '@/lib/graphics-storage';
-import { generateExecutiveInfographicPrompt } from './executive-infographic-generator';
+import { executiveInfographicPromptAgent } from './executive-infographic-prompt-agent';
 
 type GraphicsStyleConfig = {
     aspectRatio?: string;
@@ -78,7 +78,7 @@ export async function graphicsAgent(input: GraphicsAgentInput): Promise<Graphics
         console.log(`Graphics Agent: Using style "${style.name}"`);
 
         // Build image generation prompt
-        const prompt = buildGraphicsPrompt(input, style);
+        const prompt = await buildGraphicsPrompt(input, style);
 
         // Generate infographic using Gemini Imagen
         const imageData = await generateInfographic(prompt, style);
@@ -101,14 +101,14 @@ export async function graphicsAgent(input: GraphicsAgentInput): Promise<Graphics
             alt: `Infographic summarizing ${input.topic}`,
             caption: `Key insights from "${input.content.title}"`,
             placement: 'header',
-            generatedWith: 'gemini-imagen-4',
+            generatedWith: 'gemini-3-pro-image-preview',
         };
 
         return {
             assets: [asset],
             metadata: {
                 totalAssets: 1,
-                generationMethod: 'gemini-imagen-4',
+                generationMethod: 'gemini-3-pro-image-preview',
                 styleUsed: style.name,
             },
         };
@@ -119,9 +119,12 @@ export async function graphicsAgent(input: GraphicsAgentInput): Promise<Graphics
 }
 
 /**
- * Build the image generation prompt using the Executive Infographic Generator
+ * Build the image generation prompt.
+ *
+ * In executive mode, this now uses an LLM "prompt engineering" step that
+ * applies the meta-prompt + writer content to produce the final Imagen prompt.
  */
-function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleRecord): string {
+async function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleRecord): Promise<string> {
     const { topic, content } = input;
 
     // Check if executive mode is enabled (new feature)
@@ -129,35 +132,25 @@ function buildGraphicsPrompt(input: GraphicsAgentInput, style: GraphicsStyleReco
     const useExecutiveMode = config.executiveMode !== false; // Default to true
 
     if (useExecutiveMode) {
-        // Use new Executive Infographic Generator
-        console.log('Graphics Agent: Using Executive Infographic Generator mode');
+        console.log('Graphics Agent: Using executive infographic prompt agent');
 
-        const executiveOutput = generateExecutiveInfographicPrompt(content, topic);
+        const imagenPrompt = await executiveInfographicPromptAgent(content, topic);
 
-        console.log('Graphics Agent: Executive analysis:', {
-            theme: executiveOutput.analysisMetadata.detectedTheme,
-            archetype: executiveOutput.analysisMetadata.selectedArchetype,
-            zoneCount: executiveOutput.analysisMetadata.zoneCount,
-            confidence: executiveOutput.analysisMetadata.confidenceScore,
-        });
-
-        // Combine executive prompt with any style-specific overrides
-        const styleOverride = style.microPrompt
-            ? `\n\nSTYLE OVERRIDE:\n${style.microPrompt}`
-            : '';
-
-        return `${executiveOutput.prompt}${styleOverride}
+        const finalPrompt = `${imagenPrompt}
 
 TECHNICAL SPECIFICATIONS (FINAL):
 - Aspect Ratio: ${config.aspectRatio || '16:9'}
 - Resolution: ${config.width || 1920}x${config.height || 1080}px minimum
 - Format: PNG, high quality
 - Output: Professional, consulting-grade infographic`;
-    } else {
-        // Legacy mode (fallback to simple prompt if executive mode disabled)
-        console.log('Graphics Agent: Using legacy mode (executive mode disabled)');
 
-        return `${style.systemPrompt}
+        return finalPrompt;
+    }
+
+    // Legacy mode (fallback to simple prompt if executive mode disabled)
+    console.log('Graphics Agent: Using legacy mode (executive mode disabled)');
+
+    return `${style.systemPrompt}
 
 BLOG CONTENT TO VISUALIZE:
 Title: ${content.title}
@@ -178,11 +171,11 @@ TECHNICAL SPECIFICATIONS:
 - Color Scheme: ${config.colorScheme || 'balanced'}
 
 Create a professional infographic that summarizes the blog content above.`;
-    }
 }
 
+
 /**
- * Generate an infographic using Gemini Imagen API
+ * Generate an infographic using Gemini 3 Pro Image Preview
  *
  * @param prompt - The image generation prompt
  * @param style - Graphics style configuration
@@ -197,67 +190,44 @@ async function generateInfographic(
     // Extract graphics config
     const config = extractGraphicsConfig(style);
     const aspectRatio = config.aspectRatio || '16:9';
+    const imageSize = config.width && config.height ? undefined : '2K';
 
     try {
-        console.log('Graphics Agent: Calling Gemini Imagen API...');
+        console.log('Graphics Agent: Calling Gemini 3 Pro Image Preview...');
 
-        // Generate image using Gemini Imagen
-        // Note: Using the generateImages method from @google/genai SDK
-        const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: prompt,
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents: prompt,
             config: {
-                numberOfImages: 1,
-                aspectRatio: aspectRatio,
-                imageSize: '2K',
-                outputMimeType: 'image/png',
-                safetyFilterLevel: SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
-                personGeneration: PersonGeneration.DONT_ALLOW,
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: {
+                    aspectRatio,
+                    ...(imageSize ? { imageSize } : {}),
+                },
             },
         });
 
-        // Extract image data from response
-        // The response contains an array of GeneratedImage objects
-        console.log('Graphics Agent: API Response structure:', {
-            hasGeneratedImages: !!response.generatedImages,
-            imageCount: response.generatedImages?.length || 0,
-        });
+        const candidates = (response as any).candidates ?? [];
+        const parts = candidates[0]?.content?.parts ?? [];
 
-        if (!response.generatedImages || response.generatedImages.length === 0) {
-            console.error('Graphics Agent: Empty response:', response);
-            throw new Error('No images returned from Gemini Imagen');
+        let imageData: string | undefined;
+        for (const part of parts) {
+            if (part.inlineData?.data) {
+                imageData = part.inlineData.data as string;
+                break;
+            }
         }
 
-        const generatedImage = response.generatedImages[0];
-        console.log('Graphics Agent: Generated image structure:', {
-            hasImage: !!generatedImage.image,
-            hasImageBytes: !!generatedImage.image?.imageBytes,
-            hasRaiFilter: !!generatedImage.raiFilteredReason,
-        });
-
-        // Check if image was filtered
-        if (generatedImage.raiFilteredReason) {
-            throw new Error(`Image generation filtered: ${generatedImage.raiFilteredReason}`);
-        }
-
-        // Extract base64 image data
-        if (!generatedImage.image) {
-            console.error('Graphics Agent: No image property in response:', generatedImage);
-            throw new Error('No image property in generated response');
-        }
-
-        const imageData = generatedImage.image.imageBytes;
         if (!imageData) {
-            console.error('Graphics Agent: No imageBytes in response:', generatedImage.image);
-            throw new Error('No image data in response');
+            console.error('Graphics Agent: No image data in Gemini response:', response);
+            throw new Error('No image data in Gemini 3 Pro image response');
         }
 
-        console.log('Graphics Agent: Image generated successfully');
+        console.log('Graphics Agent: Image generated successfully via Gemini 3 Pro Image Preview');
 
-        // Return base64 data (may need conversion depending on SDK response format)
         return imageData;
     } catch (error) {
-        console.error('Gemini Imagen API error:', error);
+        console.error('Gemini 3 Pro Image Preview error:', error);
         throw new Error(`Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
